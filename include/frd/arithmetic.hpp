@@ -3,6 +3,7 @@
 #include <frd/defines.hpp>
 #include <frd/functional.hpp>
 #include <frd/utility.hpp>
+#include <frd/type_traits.hpp>
 
 namespace frd {
 
@@ -13,25 +14,8 @@ namespace frd {
     using ptrdiff_t = decltype(declval<int *>() - declval<int *>());
     static_assert(BITSIZEOF(ptrdiff_t) >= 17, "Since C++11, ptrdiff_t must be at least 17 bits wide");
 
-    template<size_t BitSize, auto Operator>
-    consteval auto _type_for_bit_size_impl() {
-        static_assert(dependent_false<>, "No type fits specified bit size!");
-    }
-
-    template<size_t BitSize, auto Operator, typename Head, typename... Tail>
-    consteval auto _type_for_bit_size_impl() {
-        if constexpr (Operator(BITSIZEOF(Head), BitSize)) {
-            return Head{};
-        } else {
-            return _type_for_bit_size_impl<BitSize, Operator, Tail...>();
-        }
-    }
-
-    template<size_t BitSize, auto Operator, typename... Ts>
-    using _type_for_bit_size = decltype(_type_for_bit_size_impl<BitSize, Operator, Ts...>());
-
     template<size_t BitSize, auto Operator = equal_to>
-    using int_for_bit_size = _type_for_bit_size<BitSize, Operator,
+    using int_for_bit_size = type_for_bit_size<BitSize, Operator,
         signed char,
         signed short,
         signed int,
@@ -40,7 +24,7 @@ namespace frd {
     >;
 
     template<size_t BitSize, auto Operator = equal_to>
-    using uint_for_bit_size = _type_for_bit_size<BitSize, Operator,
+    using uint_for_bit_size = type_for_bit_size<BitSize, Operator,
         unsigned char,
         unsigned short,
         unsigned int,
@@ -55,7 +39,7 @@ namespace frd {
     template<typename T> using uint_fits_type = uint_for_bit_size<BITSIZEOF(T), greater_equal>;
 
     template<size_t BitSize, auto Operator = equal_to>
-    using float_for_bit_size = _type_for_bit_size<BitSize, Operator,
+    using float_for_bit_size = type_for_bit_size<BitSize, Operator,
         float,
         double,
         long double

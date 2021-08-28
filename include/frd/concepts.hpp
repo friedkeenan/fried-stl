@@ -79,6 +79,9 @@ namespace frd {
     concept array_type = unbound_array<T> || bound_array<T>;
 
     template<typename T>
+    concept enum_type = is_enum<T>;
+
+    template<typename T>
     concept function = !const_type<const T> && !reference<T>;
 
     template<typename T>

@@ -1,5 +1,9 @@
 #pragma once
 
+#include <type_traits>
+
+#include <frd/defines.hpp>
+
 namespace frd {
 
     template<auto v>
@@ -38,6 +42,13 @@ namespace frd {
 
     template<typename T>                constexpr inline bool is_bound_array       = false;
     template<typename T, std::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
+
+    /* Only templated variables that are forced to use STL APIs below. */
+
+    template<typename T>
+    constexpr inline bool is_enum = std::is_enum_v<T>;
+
+    /* Only operations on types below. */
 
     template<typename T>
     struct type_holder {
@@ -116,6 +127,44 @@ namespace frd {
     template<typename T, typename NewArg>
     using replace_first_template_arg = replace_leading_template_args<T, NewArg>;
 
+    /* Use 'auto' for BitSize because we don't know size_t yet. */
+    template<auto BitSize, auto Operator, typename... Types>
+    struct _type_for_bit_size;
+
+    template<auto BitSize, auto Operator>
+    struct _type_for_bit_size<BitSize, Operator> {
+        static_assert(dependent_false<>, "No type for specified bit size!");
+    };
+
+    template<auto BitSize, auto Operator, typename Head, typename... Tail>
+    requires (Operator(BITSIZEOF(Head), BitSize))
+    struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : type_holder<Head> { };
+
+    template<auto BitSize, auto Operator, typename Head, typename... Tail>
+    struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : _type_for_bit_size<BitSize, Operator, Tail...> { };
+
+    template<auto BitSize, auto Operator, typename... Types>
+    using type_for_bit_size = typename _type_for_bit_size<BitSize, Operator, Types...>::type;
+
+    /* Use 'auto' for Size because we don't know size_t yet. */
+    template<auto Size, typename... Types>
+    struct _type_with_size;
+
+    template<auto Size>
+    struct _type_with_size<Size> {
+        static_assert(dependent_false<>, "No type with specified size!");
+    };
+
+    template<auto Size, typename Head, typename... Tail>
+    requires (sizeof(Head) == Size)
+    struct _type_with_size<Size, Head, Tail...> : type_holder<Head> { };
+
+    template<auto Size, typename Head, typename... Tail>
+    struct _type_with_size<Size, Head, Tail...> : _type_with_size<Size, Tail...> { };
+
+    template<auto Size, typename... Types>
+    using type_with_size = typename _type_with_size<Size, Types...>::type;
+
     template<typename Source, typename Destination>
     struct _match_const : type_holder<Destination> { };
 
@@ -176,6 +225,56 @@ namespace frd {
     template<typename T>
     using remove_signedness = remove_unsigned<remove_signed<T>>;
 
+    template<typename T> struct _make_signed   : type_holder<T> { };
+    template<typename T> struct _make_unsigned : type_holder<T> { };
+
+    #define ADD_SIGNEDNESS(cls)                                                \
+        template<> struct _make_signed  <cls> : type_holder<  signed cls> { }; \
+        template<> struct _make_unsigned<cls> : type_holder<unsigned cls> { }
+
+    ADD_SIGNEDNESS(char);
+    ADD_SIGNEDNESS(short);
+    ADD_SIGNEDNESS(int);
+    ADD_SIGNEDNESS(long);
+    ADD_SIGNEDNESS(long long);
+
+    #undef ADD_SIGNEDNESS
+
+    template<typename T>
+    using _ranked_int_with_same_size = type_with_size<sizeof(T),
+        signed char,
+        signed short,
+        signed int,
+        signed long,
+        signed long long
+    >;
+
+    template<typename T>
+    using _ranked_uint_with_same_size = type_with_size<sizeof(T),
+        unsigned char,
+        unsigned short,
+        unsigned int,
+        unsigned long,
+        unsigned long long
+    >;
+
+    template<typename T> requires (is_enum<T>) struct _make_signed<T>   : type_holder<_ranked_int_with_same_size <T>> { };
+    template<typename T> requires (is_enum<T>) struct _make_unsigned<T> : type_holder<_ranked_uint_with_same_size<T>> { };
+
+    #define ADD_RANKED_SIGNEDNESS(cls)                                                             \
+        template<> struct _make_signed<cls>   : type_holder<_ranked_int_with_same_size <cls>> { }; \
+        template<> struct _make_unsigned<cls> : type_holder<_ranked_uint_with_same_size<cls>> { }
+
+    ADD_RANKED_SIGNEDNESS(wchar_t);
+    ADD_RANKED_SIGNEDNESS(char8_t);
+    ADD_RANKED_SIGNEDNESS(char16_t);
+    ADD_RANKED_SIGNEDNESS(char32_t);
+
+    #undef ADD_RANKED_SIGNEDNESS
+
+    template<typename T> using make_signed   = match_cv<T, typename _make_signed  <remove_cv<remove_signedness<T>>>::type>;
+    template<typename T> using make_unsigned = match_cv<T, typename _make_unsigned<remove_cv<remove_signedness<T>>>::type>;
+
     template<typename T> struct _remove_reference       : type_holder<T> { };
     template<typename T> struct _remove_reference<T &>  : type_holder<T> { };
     template<typename T> struct _remove_reference<T &&> : type_holder<T> { };
@@ -196,7 +295,7 @@ namespace frd {
 
     /* void cannot be referenced, so specialize it. */
     template<typename T>
-    requires is_same<remove_cv<T>, void>
+    requires (is_same<remove_cv<T>, void>)
     struct _add_lvalue_reference<T> : type_holder<T> { };
 
     template<typename T>
@@ -206,7 +305,7 @@ namespace frd {
 
     /* void cannot be referenced, so specialize it. */
     template<typename T>
-    requires is_same<remove_cv<T>, void>
+    requires (is_same<remove_cv<T>, void>)
     struct _add_rvalue_reference<T> : type_holder<T> { };
 
     template<typename T>
@@ -221,10 +320,15 @@ namespace frd {
     struct _detected_else : type_holder<Default> { };
 
     template<typename Default, template<typename...> typename Op, typename... Args>
-    requires _op_works<Op, Args...>
+    requires (_op_works<Op, Args...>)
     struct _detected_else<Default, Op, Args...> : type_holder<Op<Args...>> { };
 
     template<typename Default, template<typename...> typename Op, typename... Args>
     using detected_else = typename _detected_else<Default, Op, Args...>::type;
+
+    /* Only operations on types that are forced to use STL APIs below. */
+
+    template<typename T>
+    using underlying_type = std::underlying_type_t<T>;
 
 }

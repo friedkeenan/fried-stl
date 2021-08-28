@@ -25,10 +25,6 @@ namespace frd {
             fun to implement I guess.
         */
 
-        #define ATTR_ELSE(cls, attr, default_type)                 \
-            template<typename T> using _##attr = typename T::attr; \
-            using attr = detected_else<default_type, _##attr, cls>
-
         template<typename T, typename U>
         concept _has_rebind = requires {
             type_holder<typename T::rebind<U>>{};
@@ -38,7 +34,7 @@ namespace frd {
         struct _rebind : type_holder<replace_first_template_arg<T, U>> { };
 
         template<typename T, typename U>
-        requires _has_rebind<T, U>
+        requires (_has_rebind<T, U>)
         struct _rebind<T, U> : type_holder<typename T::rebind<U>> { };
 
         template<typename T, typename U>
@@ -50,8 +46,12 @@ namespace frd {
         struct _rebind_other : type_holder<replace_first_template_arg<T, U>> { };
 
         template<typename T, typename U>
-        requires _has_rebind_other<T, U>
+        requires (_has_rebind_other<T, U>)
         struct _rebind_other<T, U> : type_holder<typename T::rebind<U>::other> { };
+
+        #define ATTR_ELSE(cls, attr, default_type)                 \
+            template<typename T> using _##attr = typename T::attr; \
+            using attr = detected_else<default_type, _##attr, cls>
 
         template<typename Ptr>
         struct pointer_traits {
@@ -87,27 +87,111 @@ namespace frd {
             using allocator_type = Allocator;
             using value_type     = Allocator::value_type;
 
-            ATTR_ELSE(Allocator, pointer,                                value_type *);
-            ATTR_ELSE(Allocator, const_pointer,                          typename pointer_traits<pointer>::rebind<const value_type>);
-            ATTR_ELSE(Allocator, void_pointer,                           typename pointer_traits<pointer>::rebind<void>);
-            ATTR_ELSE(Allocator, const_void_pointer,                     typename pointer_traits<pointer>::rebind<const void>);
-            ATTR_ELSE(Allocator, difference_type,                        typename pointer_traits<pointer>::difference_type);
-            // ATTR_ELSE(Allocator, size_type,                              make_unsigned<difference_type>);
-            ATTR_ELSE(Allocator, propagate_on_container_copy_assignment, false_holder);
-            ATTR_ELSE(Allocator, propagate_on_container_move_assignment, false_holder);
-            ATTR_ELSE(Allocator, propagate_on_container_swap,            false_holder);
-            ATTR_ELSE(Allocator, is_always_equal,                        constant_holder<empty<Allocator>>);
+            ATTR_ELSE(Allocator, pointer,                                 value_type *);
+            ATTR_ELSE(Allocator, const_pointer,                           typename pointer_traits<pointer>::rebind<const value_type>);
+            ATTR_ELSE(Allocator, void_pointer,                            typename pointer_traits<pointer>::rebind<void>);
+            ATTR_ELSE(Allocator, const_void_pointer,                      typename pointer_traits<pointer>::rebind<const void>);
+            ATTR_ELSE(Allocator, difference_type,                         typename pointer_traits<pointer>::difference_type);
+            ATTR_ELSE(Allocator, size_type,                               make_unsigned<difference_type>);
+            ATTR_ELSE(Allocator, _propagate_on_container_copy_assignment, false_holder);
+            ATTR_ELSE(Allocator, _propagate_on_container_move_assignment, false_holder);
+            ATTR_ELSE(Allocator, _propagate_on_container_swap,            false_holder);
+            ATTR_ELSE(Allocator, _is_always_equal,                        constant_holder<empty<Allocator>>);
+
+            #define TYPE_TO_VALUE(name) static constexpr bool name = _##name::value
+
+            TYPE_TO_VALUE(propagate_on_container_copy_assignment);
+            TYPE_TO_VALUE(propagate_on_container_move_assignment);
+            TYPE_TO_VALUE(propagate_on_container_swap);
+            TYPE_TO_VALUE(is_always_equal);
+
+            #undef TYPE_TO_VALUE
 
             template<typename U>
             using rebind_alloc = typename _rebind_other<Allocator, U>::type;
 
             template<typename U>
             using rebind_traits = allocator_traits<rebind_alloc<U>>;
+
+            [[nodiscard]]
+            static constexpr pointer allocate(Allocator &alloc, size_type n) {
+                return alloc.allocate(n);
+            }
+
+            [[nodiscard]]
+            static constexpr pointer allocate(Allocator &alloc, size_type n, const_void_pointer hint) {
+                if constexpr (requires {
+                    alloc.allocate(n, hint);
+                }) {
+                    return alloc.allocate(n, hint);
+                } else {
+                    return alloc.allocate(n);
+                }
+            }
+
+            static constexpr void deallocate(Allocator &alloc, pointer p, size_type n) {
+                alloc.deallocate(p, n);
+            }
+
+            template<typename T, typename... Args>
+            static constexpr void construct(Allocator &alloc, T *location, Args &&... args) {
+                if constexpr (requires {
+                    alloc.construct(location, forward<Args>(args)...);
+                }) {
+                    alloc.construct(location, forward<Args>(args)...);
+                } else {
+                    std::construct_at(location, forward<Args>(args)...);
+                }
+            }
+
+            template<typename T>
+            static constexpr void destroy(Allocator &alloc, T *location) {
+                if constexpr (requires {
+                    alloc.destroy(location);
+                }) {
+                    alloc.destroy(location);
+                } else {
+                    destroy_at(location);
+                }
+            }
+
+            static constexpr size_type max_size(const Allocator &alloc) noexcept {
+                if constexpr (requires {
+                    alloc.max_size();
+                }) {
+                    return alloc.max_size();
+                } else {
+                    return numeric_limits<size_type>::max / sizeof(value_type);
+                }
+            }
+
+            static constexpr Allocator select_on_container_copy_construction(const Allocator &alloc) {
+                if constexpr (requires {
+                    alloc.select_on_container_copy_construction();
+                }) {
+                    return alloc.select_on_container_copy_construction();
+                } else {
+                    return alloc;
+                }
+            }
         };
 
         #undef ATTR_ELSE
 
     }
+
+    /* An adaptor for std::allocator_traits that gives a slightly improved API. */
+    template<typename Allocator>
+    struct allocator_traits : public std::allocator_traits<Allocator> {
+        #define TYPE_TO_VALUE(name) static constexpr bool name = std::allocator_traits<Allocator>::name::value
+
+        TYPE_TO_VALUE(propagate_on_container_copy_assignment);
+        TYPE_TO_VALUE(propagate_on_container_move_assignment);
+        TYPE_TO_VALUE(propagate_on_container_swap);
+        TYPE_TO_VALUE(is_always_equal);
+
+        #undef TYPE_TO_VALUE
+    };
 
     template<typename T>
     class allocator {
@@ -154,5 +238,23 @@ namespace frd {
                 return true;
             }
     };
+
+    template<typename T>
+    constexpr T *to_address(T *ptr) noexcept {
+        static_assert(!function<T>);
+
+        return ptr;
+    }
+
+    template<typename Ptr>
+    constexpr auto to_address(const Ptr &ptr) noexcept {
+        if constexpr (requires {
+            std::pointer_traits<Ptr>::to_address(ptr);
+        }) {
+            return std::pointer_traits<Ptr>::to_address(ptr);
+        } else {
+            return to_address(ptr.operator ->());
+        }
+    }
 
 }

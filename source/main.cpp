@@ -19,23 +19,33 @@ static_assert(frd::same_as<frd::ptrdiff_t, frd::int64_t>);
 
 static_assert(frd::same_as<frd::uintptr_t, frd::uint64_t>);
 
-static_assert(frd::unsigned_integral<frd::uint8_t>);
+static_assert(frd::signed_integral<char>);
 
 static_assert(frd::same_as<frd::impl::pointer_traits<frd::allocator<int>>::rebind<char>::value_type, char>);
 
-static_assert(frd::same_as<frd::remove_signedness<const volatile int>, const volatile int>);
+static_assert(frd::same_as<frd::remove_signedness<const volatile unsigned int>, const volatile int>);
+
+static_assert(frd::same_as<frd::make_signed<unsigned int>, signed int>);
+static_assert(frd::same_as<frd::make_unsigned<const volatile int>, const volatile unsigned int>);
 
 using shit = frd::impl::allocator_traits<frd::allocator<int>>;
 
 consteval auto fuck() {
-    const auto alloc = frd::allocator<int>{};
+    using allocator_traits = frd::allocator_traits<frd::allocator<int>>;
 
-    const auto data = alloc.allocate(1);
-    *data = 1;
+    frd::allocator<int> alloc;
 
-    alloc.deallocate(data, 1);
+    const auto int_data = allocator_traits::allocate(alloc, 1);
 
-    return true;
+    allocator_traits::construct(alloc, int_data, 1);
+
+    const bool ret = (*int_data == 1);
+
+    allocator_traits::destroy(alloc, int_data);
+
+    allocator_traits::deallocate(alloc, int_data, 1);
+
+    return ret;
 }
 
 static_assert(fuck());
