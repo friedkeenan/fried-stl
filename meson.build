@@ -1,0 +1,20 @@
+project('fried-stl', 'cpp',
+    default_options : 'buildtype=release',
+)
+
+sources = []
+subdir('source')
+
+executable(meson.project_name(), sources,
+    include_directories : 'include',
+
+    cpp_args : [
+        '-std=c++2b',
+
+        '-Wall',
+        '-Wextra',
+        '-Wpedantic',
+        '-Wconversion',
+        '-Werror',
+    ],
+)
