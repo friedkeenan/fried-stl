@@ -9,7 +9,7 @@ executable(meson.project_name(), sources,
     include_directories : 'include',
 
     cpp_args : [
-        '-std=c++2b',
+        '-std=gnu++2b',
 
         '-Wall',
         '-Wextra',

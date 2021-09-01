@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include <frd/platform.hpp>
 #include <frd/defines.hpp>
 #include <frd/arithmetic.hpp>
 #include <frd/limits.hpp>
@@ -15,7 +16,7 @@ namespace frd {
         location->~T();
     }
 
-    namespace impl {
+    namespace unsafe {
         /*
             Implementations of unspecialized 'std::pointer_traits' and 'std::allocator_traits'.
 
@@ -27,7 +28,7 @@ namespace frd {
 
         template<typename T, typename U>
         concept _has_rebind = requires {
-            type_holder<typename T::rebind<U>>{};
+            typename T::template rebind<U>;
         };
 
         template<typename T, typename U>
@@ -35,11 +36,11 @@ namespace frd {
 
         template<typename T, typename U>
         requires (_has_rebind<T, U>)
-        struct _rebind<T, U> : type_holder<typename T::rebind<U>> { };
+        struct _rebind<T, U> : type_holder<typename T::template rebind<U>> { };
 
         template<typename T, typename U>
         concept _has_rebind_other = requires {
-            type_holder<typename T::rebind<U>::other>{};
+            typename T::template rebind<U>::other;
         };
 
         template<typename T, typename U>
@@ -47,7 +48,7 @@ namespace frd {
 
         template<typename T, typename U>
         requires (_has_rebind_other<T, U>)
-        struct _rebind_other<T, U> : type_holder<typename T::rebind<U>::other> { };
+        struct _rebind_other<T, U> : type_holder<typename T::template rebind<U>::other> { };
 
         #define ATTR_ELSE(cls, attr, default_type)                 \
             template<typename T> using _##attr = typename T::attr; \
@@ -85,27 +86,29 @@ namespace frd {
         template<typename Allocator>
         struct allocator_traits {
             using allocator_type = Allocator;
-            using value_type     = Allocator::value_type;
+            using value_type     = typename Allocator::value_type;
 
             ATTR_ELSE(Allocator, pointer,                                 value_type *);
-            ATTR_ELSE(Allocator, const_pointer,                           typename pointer_traits<pointer>::rebind<const value_type>);
-            ATTR_ELSE(Allocator, void_pointer,                            typename pointer_traits<pointer>::rebind<void>);
-            ATTR_ELSE(Allocator, const_void_pointer,                      typename pointer_traits<pointer>::rebind<const void>);
+            ATTR_ELSE(Allocator, const_pointer,                           typename pointer_traits<pointer>::template rebind<const value_type>);
+            ATTR_ELSE(Allocator, void_pointer,                            typename pointer_traits<pointer>::template rebind<void>);
+            ATTR_ELSE(Allocator, const_void_pointer,                      typename pointer_traits<pointer>::template rebind<const void>);
             ATTR_ELSE(Allocator, difference_type,                         typename pointer_traits<pointer>::difference_type);
             ATTR_ELSE(Allocator, size_type,                               make_unsigned<difference_type>);
-            ATTR_ELSE(Allocator, _propagate_on_container_copy_assignment, false_holder);
-            ATTR_ELSE(Allocator, _propagate_on_container_move_assignment, false_holder);
-            ATTR_ELSE(Allocator, _propagate_on_container_swap,            false_holder);
-            ATTR_ELSE(Allocator, _is_always_equal,                        constant_holder<empty<Allocator>>);
 
-            #define TYPE_TO_VALUE(name) static constexpr bool name = _##name::value
+            #define ATTR_ELSE_VALUE(name)                                               \
+                template<typename U> using _##name##_impl = typename U::name;           \
+                using _##name = detected_else<false_holder, _##name##_impl, Allocator>; \
+                static constexpr bool name = _##name::value
 
-            TYPE_TO_VALUE(propagate_on_container_copy_assignment);
-            TYPE_TO_VALUE(propagate_on_container_move_assignment);
-            TYPE_TO_VALUE(propagate_on_container_swap);
-            TYPE_TO_VALUE(is_always_equal);
+            ATTR_ELSE_VALUE(propagate_on_container_copy_assignment);
+            ATTR_ELSE_VALUE(propagate_on_container_move_assignment);
+            ATTR_ELSE_VALUE(propagate_on_container_swap);
 
-            #undef TYPE_TO_VALUE
+            #undef ATTR_ELSE_VALUE
+
+            template<typename U> using _is_always_equal_impl = typename U::is_always_equal;
+            using _is_always_equal = detected_else<constant_holder<empty<Allocator>>, _is_always_equal_impl, Allocator>;
+            static constexpr bool always_equal = _is_always_equal::value;
 
             template<typename U>
             using rebind_alloc = typename _rebind_other<Allocator, U>::type;
@@ -136,11 +139,11 @@ namespace frd {
             template<typename T, typename... Args>
             static constexpr void construct(Allocator &alloc, T *location, Args &&... args) {
                 if constexpr (requires {
-                    alloc.construct(location, forward<Args>(args)...);
+                    alloc.construct(location, frd::forward<Args>(args)...);
                 }) {
-                    alloc.construct(location, forward<Args>(args)...);
+                    alloc.construct(location, frd::forward<Args>(args)...);
                 } else {
-                    std::construct_at(location, forward<Args>(args)...);
+                    std::construct_at(location, frd::forward<Args>(args)...);
                 }
             }
 
@@ -188,58 +191,83 @@ namespace frd {
         TYPE_TO_VALUE(propagate_on_container_copy_assignment);
         TYPE_TO_VALUE(propagate_on_container_move_assignment);
         TYPE_TO_VALUE(propagate_on_container_swap);
-        TYPE_TO_VALUE(is_always_equal);
 
         #undef TYPE_TO_VALUE
+
+        static constexpr bool always_equal = std::allocator_traits<Allocator>::is_always_equal::value;
+
+        [[nodiscard]]
+        static constexpr bool are_equal(const Allocator &lhs, const Allocator &rhs) noexcept {
+            if constexpr (always_equal) {
+                return true;
+            } else {
+                return (lhs == rhs);
+            }
+        }
     };
 
     template<typename T>
     class allocator {
         public:
             using value_type = T;
-            using size_type  = size_t;
+            using size_type  = frd::size_t;
 
             union UnitializedElement {
                 T elem;
+
+                /* Cannot be defaulted as then it will try to default-construct 'elem'. */
+                constexpr UnitializedElement() { }
             };
 
             constexpr allocator() noexcept = default;
             constexpr allocator(const allocator &other) noexcept = default;
 
             template<typename U>
-            constexpr allocator(const allocator<U> &other) { }
+            constexpr allocator(const allocator<U> &other) {
+                UNUSED(other);
+            }
 
             constexpr ~allocator() = default;
 
             [[nodiscard]]
             constexpr T *allocate(size_type n) const {
-                /*
-                    I've checked as carefully as I can, and I don't believe this to be UB.
+                if constexpr (!platform::clang()) {
+                    /*
+                        I've checked as carefully as I can, and I don't believe this to be UB.
 
-                    Clang will report that you can't cast from 'void *' in constexpr, but
-                    GCC gobbles it up just fine, and if you implement it without constexpr
-                    then Clang works just fine with this.
-                */
-                return static_cast<T *>(static_cast<void *>(new UnitializedElement[n]));
+                        Clang will report that you can't cast from 'void *' in constexpr, but
+                        GCC gobbles it up just fine, and if you implement it without constexpr
+                        then Clang works just fine with this.
+                    */
+                    return static_cast<T *>(static_cast<void *>(new UnitializedElement[n]));
+                } else {
+                    return std::allocator<T>().allocate(n);
+                }
             }
 
             constexpr void deallocate(T *ptr, size_type n) const noexcept {
-                UNUSED(n);
-
-                /*
-                    I believe the static_cast is unnecessary but am
-                    including it to remind of how 'ptr' was created.
-                */
-                delete[] static_cast<UnitializedElement *>(static_cast<void *>(ptr));
+                if constexpr (!platform::clang()) {
+                    /*
+                        I believe the static_casts are unnecessary but am
+                        including them to remind of how 'ptr' was created.
+                    */
+                    delete[] static_cast<UnitializedElement *>(static_cast<void *>(ptr));
+                } else {
+                    std::allocator<T>().deallocate(ptr, n);
+                }
             }
 
             template<typename U>
+            [[nodiscard]]
             constexpr bool operator ==(const allocator<U> &rhs) const noexcept {
+                UNUSED(rhs);
+
                 return true;
             }
     };
 
     template<typename T>
+    [[nodiscard]]
     constexpr T *to_address(T *ptr) noexcept {
         static_assert(!function<T>);
 
@@ -247,6 +275,7 @@ namespace frd {
     }
 
     template<typename Ptr>
+    [[nodiscard]]
     constexpr auto to_address(const Ptr &ptr) noexcept {
         if constexpr (requires {
             std::pointer_traits<Ptr>::to_address(ptr);
@@ -255,6 +284,187 @@ namespace frd {
         } else {
             return to_address(ptr.operator ->());
         }
+    }
+
+    template<typename T, typename Allocator = allocator<T>>
+    requires (!bound_array<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
+    class scoped_ptr {
+        NON_COPYABLE(scoped_ptr);
+
+        public:
+            using _allocator_traits = allocator_traits<Allocator>;
+
+            using allocator_type  = Allocator;
+            using value_type      = T;
+            using pointer         = typename _allocator_traits::pointer;
+            using reference       = T &;
+            using const_reference = const T &;
+
+            [[nodiscard]]
+            constexpr pointer _move_element(Allocator &alloc, T &elem) {
+                const auto ptr = _allocator_traits::allocate(alloc, 1);
+                _allocator_traits::construct(alloc, ptr, frd::move(elem));
+
+                return ptr;
+            }
+
+            pointer _ptr = nullptr;
+
+            [[no_unique_address]] Allocator _allocator;
+
+            /*
+                I would prefer to have make_unique instead just be a constructor for
+                scoped_ptr, but that will result in a lot of potential ambiguity with
+                other constructors, such as the move constructor.
+            */
+            constexpr scoped_ptr() noexcept(noexcept(Allocator())) requires (default_constructible<Allocator>) = default;
+
+            constexpr explicit scoped_ptr(const Allocator &alloc) noexcept : _allocator(alloc) { }
+
+            constexpr explicit scoped_ptr(const pointer ptr, const Allocator &alloc = Allocator()) noexcept : _ptr(ptr), _allocator(alloc) { }
+
+            constexpr scoped_ptr(scoped_ptr &&other) noexcept : _ptr(other.release()), _allocator(frd::move(other._allocator)) { }
+
+            constexpr scoped_ptr(scoped_ptr &&other, const Allocator &alloc) noexcept requires (_allocator_traits::always_equal)
+                : _ptr(other.release()), _allocator(alloc) { }
+
+            constexpr scoped_ptr(scoped_ptr &&other, const Allocator &alloc) : _allocator(alloc) {
+                if (other.empty()) {
+                    this->_ptr = nullptr;
+                } else if (this->_allocator == other._allocator) {
+                    this->_ptr = other.release();
+                } else {
+                    this->_ptr = _move_element(this->_allocator, *other._ptr);
+
+                    other._destroy(other._ptr);
+                    other._ptr = nullptr;
+                }
+            }
+
+            constexpr scoped_ptr &operator =(scoped_ptr &&rhs) noexcept(_allocator_traits::propagate_on_container_move_assignment || _allocator_traits::always_equal) {
+                CHECK_SELF(rhs);
+
+                if (!this->empty()) {
+                    this->_destroy(this->_ptr);
+                }
+
+                if constexpr (_allocator_traits::propagate_on_container_move_assignment) {
+                    this->_allocator = frd::move(rhs._allocator);
+                    this->_ptr       = rhs.release();
+                } else if (rhs.empty()) {
+                    this->_ptr = nullptr;
+                } else if (_allocator_traits::are_equal(this->_allocator, rhs._allocator)) {
+                    this->_ptr = rhs.release();
+                } else {
+                    this->_ptr = _move_element(this->_allocator, *rhs._ptr);
+
+                    rhs._destroy(rhs._ptr);
+                    rhs._ptr = nullptr;
+
+                }
+
+                return *this;
+            }
+
+            constexpr ~scoped_ptr() {
+                if (!this->empty()) {
+                    this->_destroy(this->_ptr);
+                }
+            }
+
+            constexpr void _destroy(const pointer ptr) {
+                _allocator_traits::destroy(this->_allocator, ptr);
+                _allocator_traits::deallocate(this->_allocator, ptr, 1);
+            }
+
+            [[nodiscard]]
+            constexpr pointer get() const noexcept {
+                return this->_ptr;
+            }
+
+            [[nodiscard]]
+            constexpr bool empty() const noexcept {
+                return this->_ptr == nullptr;
+            }
+
+            [[nodiscard]]
+            constexpr pointer release() noexcept {
+                return frd::exchange(this->_ptr, nullptr);
+            }
+
+            constexpr void reset(pointer ptr = pointer()) noexcept {
+                const auto old_ptr = frd::exchange(this->_ptr, ptr);
+
+                if (old_ptr != nullptr) {
+                    this->_destroy(old_ptr);
+                }
+            }
+
+            constexpr void swap(scoped_ptr &other) noexcept(_allocator_traits::propagate_on_container_swap || _allocator_traits::always_equal) {
+                if (frd::same_obj(*this, other)) {
+                    return;
+                }
+
+                if constexpr (_allocator_traits::propagate_on_container_swap) {
+                    frd::swap(this->_allocator, other._allocator);
+                    frd::swap(this->_ptr,       other._ptr);
+                } else if (this->empty() && other.empty()) {
+                    return;
+                } else if (_allocator_traits::are_equal(this->_allocator, other._allocator)) {
+                    frd::swap(this->_ptr, other._ptr);
+                } else {
+                    if (other.empty()) {
+                        other._ptr = _move_element(other._allocator, *this->_ptr);
+
+                        this->_destroy(this->_ptr);
+                        this->_ptr = nullptr;
+                    } else if (this->empty()) {
+                        this->_ptr = _move_element(this->_allocator, *other._ptr);
+
+                        other._destroy(other._ptr);
+                        other._ptr = nullptr;
+                    } else {
+                        frd::swap(*this->_ptr, *other._ptr);
+                    }
+                }
+            }
+
+            [[nodiscard]]
+            constexpr Allocator get_allocator() const noexcept {
+                return this->_allocator;
+            }
+
+            [[nodiscard]]
+            constexpr reference operator *() noexcept(noexcept(*frd::declval<pointer>())) {
+                return *(this->_ptr);
+            }
+
+            [[nodiscard]]
+            constexpr const_reference operator *() const noexcept(noexcept(*frd::declval<pointer>())) {
+                return *(this->_ptr);
+            }
+
+            constexpr pointer operator ->() const noexcept {
+                return this->_ptr;
+            }
+    };
+
+    template<typename T, typename Allocator>
+    constexpr void swap(scoped_ptr<T, Allocator> &lhs, scoped_ptr<T, Allocator> &rhs) noexcept(noexcept(lhs.swap(rhs))) {
+        lhs.swap(rhs);
+    }
+
+    template<typename T, typename Allocator, typename... Args>
+    constexpr scoped_ptr<T, Allocator> make_scoped_with_allocator(Allocator alloc, Args &&... args) {
+        const auto ptr = allocator_traits<Allocator>::allocate(alloc, 1);
+        allocator_traits<Allocator>::construct(alloc, ptr, frd::forward<Args>(args)...);
+
+        return scoped_ptr<T, Allocator>(ptr, alloc);
+    }
+
+    template<typename T, default_constructible Allocator = allocator<T>, typename... Args>
+    constexpr scoped_ptr<T, Allocator> make_scoped(Args &&... args) {
+        return make_scoped_with_allocator<T, Allocator>(Allocator(), frd::forward<Args>(args)...);
     }
 
 }

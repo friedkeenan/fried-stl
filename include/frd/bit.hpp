@@ -2,9 +2,17 @@
 
 #include <frd/concepts.hpp>
 
-namespace frd {
+namespace frd::unsafe {
 
-    enum class byte : unsigned char [[gnu::may_alias]] { };
+    /*
+        An implementation of std::byte.
+
+        It is not correct to use this, as it is not allowed to alias
+        types, and I can find no way to make it do so under either
+        Clang or GCC, even with the 'may_alias' attribute.
+    */
+
+    enum class byte : unsigned char { };
 
     template<integral IntegerType>
     constexpr IntegerType to_integer(const byte b) {

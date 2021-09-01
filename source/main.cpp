@@ -21,31 +21,32 @@ static_assert(frd::same_as<frd::uintptr_t, frd::uint64_t>);
 
 static_assert(frd::signed_integral<char>);
 
-static_assert(frd::same_as<frd::impl::pointer_traits<frd::allocator<int>>::rebind<char>::value_type, char>);
+static_assert(frd::same_as<frd::unsafe::allocator_traits<frd::allocator<int>>::rebind_alloc<char>::value_type, char>);
 
 static_assert(frd::same_as<frd::remove_signedness<const volatile unsigned int>, const volatile int>);
 
 static_assert(frd::same_as<frd::make_signed<unsigned int>, signed int>);
 static_assert(frd::same_as<frd::make_unsigned<const volatile int>, const volatile unsigned int>);
 
-using shit = frd::impl::allocator_traits<frd::allocator<int>>;
-
 consteval auto fuck() {
-    using allocator_traits = frd::allocator_traits<frd::allocator<int>>;
+    struct S {
+        bool _shit;
 
-    frd::allocator<int> alloc;
+        constexpr S(bool shit) : _shit(shit) { }
 
-    const auto int_data = allocator_traits::allocate(alloc, 1);
+        constexpr bool shit() const noexcept {
+            return this->_shit;
+        }
+    };
 
-    allocator_traits::construct(alloc, int_data, 1);
+    struct Cuck : public S {
+        constexpr Cuck() : S(true) { }
+    };
 
-    const bool ret = (*int_data == 1);
+    auto data = frd::make_scoped<Cuck>();
+    const auto new_data = frd::move(data);
 
-    allocator_traits::destroy(alloc, int_data);
-
-    allocator_traits::deallocate(alloc, int_data, 1);
-
-    return ret;
+    return new_data->shit();
 }
 
 static_assert(fuck());

@@ -10,10 +10,21 @@ namespace frd {
     template<typename T, typename U>
     concept same_as = is_same<T, U>;
 
+    template<typename T, typename U>
+    concept same_as_without_cv = same_as<remove_cv<T>, remove_cv<U>>;
+
     template<typename From, typename To>
-    concept convertible_to = requires (add_rvalue_reference<From> (&func)(To), From from) {
-        static_cast<To>(func(from));
+    concept implicitly_convertible_to = requires(void (&func)(To), From from) {
+        func(from);
     };
+
+    template<typename From, typename To>
+    concept convertible_to = (
+        implicitly_convertible_to<From, To> &&
+        requires(add_rvalue_reference<From> (&func)()) {
+            static_cast<To>(func());
+        }
+    );
 
     template<typename B>
     concept boolean_testable = convertible_to<B, bool> && requires(B &&b) {
@@ -22,23 +33,23 @@ namespace frd {
 
     template<typename T>
     concept integral = (
-        same_as<remove_signedness<remove_cv<T>>, bool>      ||
-        same_as<remove_signedness<remove_cv<T>>, char>      ||
-        same_as<remove_signedness<remove_cv<T>>, char8_t>   ||
-        same_as<remove_signedness<remove_cv<T>>, char16_t>  ||
-        same_as<remove_signedness<remove_cv<T>>, char32_t>  ||
-        same_as<remove_signedness<remove_cv<T>>, wchar_t>   ||
-        same_as<remove_signedness<remove_cv<T>>, short>     ||
-        same_as<remove_signedness<remove_cv<T>>, int>       ||
-        same_as<remove_signedness<remove_cv<T>>, long>      ||
-        same_as<remove_signedness<remove_cv<T>>, long long>
+        same_as_without_cv<remove_signedness<T>, bool>      ||
+        same_as_without_cv<remove_signedness<T>, char>      ||
+        same_as_without_cv<remove_signedness<T>, char8_t>   ||
+        same_as_without_cv<remove_signedness<T>, char16_t>  ||
+        same_as_without_cv<remove_signedness<T>, char32_t>  ||
+        same_as_without_cv<remove_signedness<T>, wchar_t>   ||
+        same_as_without_cv<remove_signedness<T>, short>     ||
+        same_as_without_cv<remove_signedness<T>, int>       ||
+        same_as_without_cv<remove_signedness<T>, long>      ||
+        same_as_without_cv<remove_signedness<T>, long long>
     );
 
     template<typename T>
     concept floating_point = (
-        same_as<remove_cv<T>, float>       ||
-        same_as<remove_cv<T>, double>      ||
-        same_as<remove_cv<T>, long double>
+        same_as_without_cv<T, float>       ||
+        same_as_without_cv<T, double>      ||
+        same_as_without_cv<T, long double>
     );
 
     template<typename T>
@@ -82,14 +93,23 @@ namespace frd {
     concept enum_type = is_enum<T>;
 
     template<typename T>
+    concept void_type = same_as_without_cv<T, void>;
+
+    template<typename T>
     concept function = !const_type<const T> && !reference<T>;
 
     template<typename T>
     concept object = (
         !function<T>      &&
         !reference<T>     &&
-        !same_as<T, void>
+        !void_type<T>
     );
+
+    template<typename T>
+    concept incomplete = !requires {
+        /* You cannot find the size of incomplete types. */
+        sizeof(T);
+    };
 
     template<typename T, typename U>
     concept common_reference_with = (
@@ -113,8 +133,8 @@ namespace frd {
     template<typename T>
     concept destructible =
         !(
-            same_as<remove_cv<T>, void> ||
-            function<T>                 ||
+            void_type<T>     ||
+            function<T>      ||
             unbound_array<T>
         ) &&
         (
@@ -134,6 +154,18 @@ namespace frd {
         requires(Args &&... args) {
             T(forward<Args>(args)...);
         };
+
+    template<typename T>
+    concept default_constructible = constructible_from<T> && requires {
+        T{};
+
+        /*
+            Ensure 'T t;' is well formed.
+
+            Cannot do 'T t;' for whatever reason.
+        */
+        ::new(static_cast<void *>(nullptr)) T;
+    };
 
     template<typename T>
     concept move_constructible = constructible_from<T, T> && convertible_to<T, T>;

@@ -25,8 +25,7 @@ namespace frd {
     using false_holder = constant_holder<false>;
     using true_holder  = constant_holder<true>;
 
-    template<typename = void>
-    constexpr inline bool dependent_false = false;
+    template<typename Head, typename... Tail> constexpr inline bool dependent_false = false;
 
     template<typename T, typename U> constexpr inline bool is_same       = false;
     template<typename T>             constexpr inline bool is_same<T, T> = true;
@@ -133,7 +132,7 @@ namespace frd {
 
     template<auto BitSize, auto Operator>
     struct _type_for_bit_size<BitSize, Operator> {
-        static_assert(dependent_false<>, "No type for specified bit size!");
+        static_assert(dependent_false<decltype(BitSize)>, "No type for specified bit size!");
     };
 
     template<auto BitSize, auto Operator, typename Head, typename... Tail>
@@ -152,7 +151,7 @@ namespace frd {
 
     template<auto Size>
     struct _type_with_size<Size> {
-        static_assert(dependent_false<>, "No type with specified size!");
+        static_assert(dependent_false<decltype(Size)>, "No type with specified size!");
     };
 
     template<auto Size, typename Head, typename... Tail>
@@ -165,20 +164,14 @@ namespace frd {
     template<auto Size, typename... Types>
     using type_with_size = typename _type_with_size<Size, Types...>::type;
 
-    template<typename Source, typename Destination>
-    struct _match_const : type_holder<Destination> { };
-
-    template<typename Source, typename Destination>
-    struct _match_const<const Source, Destination> : type_holder<const Destination> { };
+    template<typename Source, typename Destination> struct _match_const                            : type_holder<Destination> { };
+    template<typename Source, typename Destination> struct _match_const<const Source, Destination> : type_holder<const Destination> { };
 
     template<typename Source, typename Destination>
     using match_const = typename _match_const<Source, Destination>::type;
 
-    template<typename Source, typename Destination>
-    struct _match_volatile : type_holder<Destination> { };
-
-    template<typename Source, typename Destination>
-    struct _match_volatile<volatile Source, Destination> : type_holder<volatile Destination> { };
+    template<typename Source, typename Destination> struct _match_volatile                               : type_holder<Destination> { };
+    template<typename Source, typename Destination> struct _match_volatile<volatile Source, Destination> : type_holder<volatile Destination> { };
 
     template<typename Source, typename Destination>
     using match_volatile = typename _match_volatile<Source, Destination>::type;
@@ -293,7 +286,7 @@ namespace frd {
 
     template<typename T> struct _add_lvalue_reference : type_holder<T &> { };
 
-    /* void cannot be referenced, so specialize it. */
+    /* 'void' cannot be referenced, so specialize it. */
     template<typename T>
     requires (is_same<remove_cv<T>, void>)
     struct _add_lvalue_reference<T> : type_holder<T> { };
@@ -303,7 +296,7 @@ namespace frd {
 
     template<typename T> struct _add_rvalue_reference : type_holder<T &&> { };
 
-    /* void cannot be referenced, so specialize it. */
+    /* 'void' cannot be referenced, so specialize it. */
     template<typename T>
     requires (is_same<remove_cv<T>, void>)
     struct _add_rvalue_reference<T> : type_holder<T> { };
@@ -313,7 +306,7 @@ namespace frd {
 
     template<template<typename...> typename Op, typename... Args>
     concept _op_works = requires {
-        type_holder<Op<Args...>>{};
+        typename Op<Args...>;
     };
 
     template<typename Default, template<typename...> typename Op, typename... Args>

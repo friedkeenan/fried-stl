@@ -11,7 +11,7 @@
 namespace frd {
 
     template<typename T, typename U>
-    concept __tuple_comparable_impl = requires(const T &t, const U &u) {
+    concept _tuple_comparable_impl = requires(const T &t, const U &u) {
         { t < u } -> boolean_testable;
         { u < t } -> boolean_testable;
     };
@@ -33,10 +33,10 @@ namespace frd {
             static consteval bool IsComparable() {
                 return (
                     std::three_way_comparable_with<Head, CmpHead> ||
-                    __tuple_comparable_impl<Head, CmpHead>
+                    _tuple_comparable_impl<Head, CmpHead>
                 ) && ((
                     std::three_way_comparable_with<Tail, CmpTail> ||
-                    __tuple_comparable_impl<Tail, CmpTail>
+                    _tuple_comparable_impl<Tail, CmpTail>
                 ) && ...);
             }
 
@@ -156,51 +156,56 @@ namespace frd {
 
 }
 
-template<typename... Ts>
-struct std::tuple_size<frd::tuple<Ts...>> : frd::constant_holder<sizeof...(Ts)> { };
+/* Allow for use with structured binding. */
+namespace std {
 
-/* Recursive case. */
-template<std::size_t I, typename Head, typename... Tail>
-struct std::tuple_element<I, frd::tuple<Head, Tail...>> : std::tuple_element<I - 1, frd::tuple<Tail...>> { };
+    template<typename... Ts>
+    struct tuple_size<frd::tuple<Ts...>> : frd::constant_holder<sizeof...(Ts)> { };
 
-/* Base case. */
-template<typename Head, typename... Tail>
-struct std::tuple_element<0, frd::tuple<Head, Tail...>> {
-    using type = Head;
-};
+    /* Recursive case. */
+    template<std::size_t I, typename Head, typename... Tail>
+    struct tuple_element<I, frd::tuple<Head, Tail...>> : tuple_element<I - 1, frd::tuple<Tail...>> { };
 
-template<typename T, typename Head, typename... Tail>
-constexpr T &std::get(frd::tuple<Head, Tail...> &t) noexcept {
-    if constexpr (frd::same_as<T, Head>) {
-        return t._head;
-    } else {
-        return std::get<T>(t._tail);
+    /* Base case. */
+    template<typename Head, typename... Tail>
+    struct tuple_element<0, frd::tuple<Head, Tail...>> {
+        using type = Head;
+    };
+
+    template<typename T, typename Head, typename... Tail>
+    constexpr T &get(frd::tuple<Head, Tail...> &t) noexcept {
+        if constexpr (frd::same_as<T, Head>) {
+            return t._head;
+        } else {
+            return get<T>(t._tail);
+        }
     }
-}
 
-template<typename T, typename Head, typename... Tail>
-constexpr const T &std::get(const frd::tuple<Head, Tail...> &t) noexcept {
-    if constexpr (frd::same_as<T, Head>) {
-        return t._head;
-    } else {
-        return std::get<T>(t._tail);
+    template<typename T, typename Head, typename... Tail>
+    constexpr const T &get(const frd::tuple<Head, Tail...> &t) noexcept {
+        if constexpr (frd::same_as<T, Head>) {
+            return t._head;
+        } else {
+            return get<T>(t._tail);
+        }
     }
-}
 
-template<typename T, typename Head, typename... Tail>
-constexpr T &&std::get(frd::tuple<Head, Tail...> &&t) noexcept {
-    if constexpr (frd::same_as<T, Head>) {
-        return std::move(t._head);
-    } else {
-        return std::get<T>(std::move(t._tail));
+    template<typename T, typename Head, typename... Tail>
+    constexpr T &&get(frd::tuple<Head, Tail...> &&t) noexcept {
+        if constexpr (frd::same_as<T, Head>) {
+            return frd::move(t._head);
+        } else {
+            return get<T>(std::move(t._tail));
+        }
     }
-}
 
-template<typename T, typename Head, typename... Tail>
-constexpr const T &&std::get(const frd::tuple<Head, Tail...> &&t) noexcept {
-    if constexpr (frd::same_as<T, Head>) {
-        return std::move(t._head);
-    } else {
-        return std::get<T>(std::move(t._tail));
+    template<typename T, typename Head, typename... Tail>
+    constexpr const T &&get(const frd::tuple<Head, Tail...> &&t) noexcept {
+        if constexpr (frd::same_as<T, Head>) {
+            return frd::move(t._head);
+        } else {
+            return get<T>(std::move(t._tail));
+        }
     }
+
 }
