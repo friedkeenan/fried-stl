@@ -308,7 +308,7 @@ namespace frd {
             using const_reference = const T &;
 
             [[nodiscard]]
-            constexpr pointer _move_element(Allocator &alloc, T &elem) {
+            static constexpr pointer _move_element(Allocator &alloc, T &elem) {
                 const auto ptr = _allocator_traits::allocate(alloc, 1);
                 _allocator_traits::construct(alloc, ptr, frd::move(elem));
 
