@@ -289,6 +289,13 @@ namespace frd {
     template<typename T, typename Allocator = allocator<T>>
     requires (!array_type<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
     class scoped_ptr {
+        /*
+            scoped_ptr does not have an array overload, nor does it allow
+            to convert a scoped_ptr<Derived> to a scoped_ptr<Base>, as the
+            implementation needed for those things and allocator-awareness
+            is not fun and I do not want to do it.
+        */
+
         NON_COPYABLE(scoped_ptr);
 
         public:
@@ -313,7 +320,7 @@ namespace frd {
             [[no_unique_address]] Allocator _allocator;
 
             /*
-                I would prefer to have make_unique instead just be a constructor for
+                I would prefer to have make_scoped instead just be a constructor for
                 scoped_ptr, but that will result in a lot of potential ambiguity with
                 other constructors, such as the move constructor.
             */
