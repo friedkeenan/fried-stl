@@ -8,7 +8,8 @@ subdir('source')
 executable(meson.project_name(), sources,
     include_directories : 'include',
 
-    cpp_args : [
+    link_args : '-s',
+    cpp_args  : [
         '-std=gnu++2b',
 
         '-Wall',

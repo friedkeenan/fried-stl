@@ -287,7 +287,7 @@ namespace frd {
     }
 
     template<typename T, typename Allocator = allocator<T>>
-    requires (!bound_array<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
+    requires (!array_type<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
     class scoped_ptr {
         NON_COPYABLE(scoped_ptr);
 
@@ -455,6 +455,7 @@ namespace frd {
     }
 
     template<typename T, typename Allocator, typename... Args>
+    requires (constructible_from<T, Args...>)
     constexpr scoped_ptr<T, Allocator> make_scoped_with_allocator(Allocator alloc, Args &&... args) {
         const auto ptr = allocator_traits<Allocator>::allocate(alloc, 1);
         allocator_traits<Allocator>::construct(alloc, ptr, frd::forward<Args>(args)...);
@@ -463,6 +464,7 @@ namespace frd {
     }
 
     template<typename T, default_constructible Allocator = allocator<T>, typename... Args>
+    requires (constructible_from<T, Args...>)
     constexpr scoped_ptr<T, Allocator> make_scoped(Args &&... args) {
         return make_scoped_with_allocator<T, Allocator>(Allocator(), frd::forward<Args>(args)...);
     }

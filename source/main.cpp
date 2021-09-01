@@ -39,11 +39,7 @@ consteval auto fuck() {
         }
     };
 
-    struct Cuck : public S {
-        constexpr Cuck() : S(true) { }
-    };
-
-    auto data = frd::make_scoped<Cuck>();
+    auto data = frd::make_scoped<S>(true);
     const auto new_data = frd::move(data);
 
     return new_data->shit();
