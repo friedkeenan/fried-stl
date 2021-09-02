@@ -618,13 +618,8 @@ namespace frd {
             }
 
             [[nodiscard]]
-            constexpr reference operator *() noexcept(noexcept(*frd::declval<pointer>())) {
-                return *(this->_ptr);
-            }
-
-            [[nodiscard]]
-            constexpr const_reference operator *() const noexcept(noexcept(*frd::declval<pointer>())) {
-                return *(this->_ptr);
+            constexpr reference operator *() const noexcept(noexcept(*frd::declval<pointer>())) {
+                return *this->_ptr;
             }
 
             constexpr pointer operator ->() const noexcept {
