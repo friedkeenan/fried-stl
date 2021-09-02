@@ -15,11 +15,11 @@ namespace frd {
         header to avoid dependency gunkery like this?
     */
     using size_t = _size_t;
-    static_assert(BITSIZEOF(size_t) >= 16, "Since C++11, size_t must be at least 16 bits wide");
+    static_assert(FRD_BITSIZEOF(size_t) >= 16, "Since C++11, size_t must be at least 16 bits wide");
 
     /* Could static_cast nullptr's, but 'declval' signals intent better. */
     using ptrdiff_t = decltype(declval<int *>() - declval<int *>());
-    static_assert(BITSIZEOF(ptrdiff_t) >= 17, "Since C++11, ptrdiff_t must be at least 17 bits wide");
+    static_assert(FRD_BITSIZEOF(ptrdiff_t) >= 17, "Since C++11, ptrdiff_t must be at least 17 bits wide");
 
     template<size_t BitSize, auto Operator = equal_to>
     using int_for_bit_size = type_for_bit_size<BitSize, Operator,
@@ -42,8 +42,8 @@ namespace frd {
     template<size_t BitSize> using  int_fits_bit_size =  int_for_bit_size<BitSize, greater_equal>;
     template<size_t BitSize> using uint_fits_bit_size = uint_for_bit_size<BitSize, greater_equal>;
 
-    template<typename T> using  int_fits_type =  int_for_bit_size<BITSIZEOF(T), greater_equal>;
-    template<typename T> using uint_fits_type = uint_for_bit_size<BITSIZEOF(T), greater_equal>;
+    template<typename T> using  int_fits_type =  int_for_bit_size<FRD_BITSIZEOF(T), greater_equal>;
+    template<typename T> using uint_fits_type = uint_for_bit_size<FRD_BITSIZEOF(T), greater_equal>;
 
     template<size_t BitSize, auto Operator = equal_to>
     using float_for_bit_size = type_for_bit_size<BitSize, Operator,

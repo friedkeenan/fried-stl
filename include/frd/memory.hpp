@@ -290,7 +290,7 @@ namespace frd {
     class _unique_ptr_impl {
         /* A common base class for primary and array overloads of unique_ptr. */
 
-        NON_COPYABLE(_unique_ptr_impl);
+        FRD_NON_COPYABLE(_unique_ptr_impl);
 
         public:
             using element_type    = Element;
@@ -472,7 +472,7 @@ namespace frd {
             is not fun and I do not want to do it.
         */
 
-        NON_COPYABLE(scoped_ptr);
+        FRD_NON_COPYABLE(scoped_ptr);
 
         public:
             using _allocator_traits = allocator_traits<Allocator>;

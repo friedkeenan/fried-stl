@@ -137,7 +137,7 @@ namespace frd {
     };
 
     template<_size_t BitSize, auto Operator, typename Head, typename... Tail>
-    requires (Operator(BITSIZEOF(Head), BitSize))
+    requires (Operator(FRD_BITSIZEOF(Head), BitSize))
     struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : type_holder<Head> { };
 
     template<_size_t BitSize, auto Operator, typename Head, typename... Tail>

@@ -51,12 +51,12 @@ static_assert(fuck());
 static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 
 int main(int argc, char **argv) {
-    UNUSED(argc, argv);
+    FRD_UNUSED(argc, argv);
 
     const auto fuck = frd::tuple{1, 2};
 
     const auto &[x, y] = fuck;
-    UNUSED(x, y);
+    FRD_UNUSED(x, y);
 
     for (const auto &i : fuck) {
         std::printf("%d\n", i);
