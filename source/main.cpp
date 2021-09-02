@@ -28,10 +28,11 @@ static_assert(frd::same_as<frd::remove_signedness<const volatile unsigned int>, 
 static_assert(frd::same_as<frd::make_signed<unsigned int>, signed int>);
 static_assert(frd::same_as<frd::make_unsigned<const volatile int>, const volatile unsigned int>);
 
-consteval auto fuck() {
+consteval bool fuck() {
     struct S {
-        bool _shit;
+        bool _shit = true;
 
+        constexpr S() = default;
         constexpr S(bool shit) : _shit(shit) { }
 
         constexpr bool shit() const noexcept {
@@ -39,13 +40,15 @@ consteval auto fuck() {
         }
     };
 
-    auto data = frd::make_scoped<S>(true);
+    auto data = frd::make_unique<S>(1);
     const auto new_data = frd::move(data);
 
     return new_data->shit();
 }
 
 static_assert(fuck());
+
+static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 
 int main(int argc, char **argv) {
     UNUSED(argc, argv);

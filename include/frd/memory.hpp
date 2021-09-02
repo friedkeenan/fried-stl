@@ -286,6 +286,182 @@ namespace frd {
         }
     }
 
+    template<typename Element>
+    class _unique_ptr_impl {
+        /* A common base class for primary and array overloads of unique_ptr. */
+
+        NON_COPYABLE(_unique_ptr_impl);
+
+        public:
+            using element_type    = Element;
+            using pointer         = Element *;
+            using reference       = Element &;
+            using const_reference = const Element &;
+
+            pointer _ptr = nullptr;
+
+            /*
+                I would prefer to have make_unique instead just be a constructor for
+                unique_ptr, but that will result in a lot of potential ambiguity with
+                other constructors, such as the move constructor.
+            */
+            constexpr _unique_ptr_impl() = default;
+
+            constexpr explicit _unique_ptr_impl(const pointer ptr) noexcept : _ptr(ptr) { }
+
+            [[nodiscard]]
+            constexpr pointer get() const noexcept {
+                return this->_ptr;
+            }
+
+            [[nodiscard]]
+            constexpr bool empty() const noexcept {
+                return this->_ptr == nullptr;
+            }
+
+            [[nodiscard]]
+            constexpr pointer release() noexcept {
+                return frd::exchange(this->_ptr, nullptr);
+            }
+
+            constexpr void swap(_unique_ptr_impl &other) noexcept {
+                frd::swap(this->_ptr, other._ptr);
+            }
+    };
+
+    template<typename T>
+    requires (!bound_array<T>)
+    class unique_ptr : public _unique_ptr_impl<T> {
+        /* A minimal implementation of std::unique_ptr, with no custom deleters. */
+
+        public:
+            using pointer   = T *;
+            using reference = T &;
+
+            constexpr unique_ptr(const pointer ptr) : _unique_ptr_impl<T>(ptr) { }
+
+            template<typename U>
+            requires (implicitly_convertible_to<U *, pointer>)
+            constexpr unique_ptr(unique_ptr<U> &&other) : _unique_ptr_impl<T>(other.release()) { }
+
+            template<typename U>
+            requires (implicitly_convertible_to<U *, pointer>)
+            constexpr unique_ptr &operator =(unique_ptr<U> &&rhs) noexcept {
+                /* Only check if assigning to self if 'rhs' is of the same type. */
+                if constexpr (same_as<U, T>) {
+                    CHECK_SELF(rhs);
+                }
+
+                if (!this->empty()) {
+                    delete this->_ptr;
+                }
+
+                this->_ptr = rhs.release();
+
+                return *this;
+            }
+
+            constexpr ~unique_ptr() noexcept {
+                if (!this->empty()) {
+                    delete this->_ptr;
+                }
+            }
+
+            constexpr void reset(const pointer ptr = pointer()) noexcept {
+                const auto old_ptr = frd::exchange(this->_ptr, ptr);
+
+                if (old_ptr != nullptr) {
+                    delete old_ptr;
+                }
+            }
+
+            [[nodiscard]]
+            constexpr reference operator *() const noexcept(noexcept(*frd::declval<pointer>())) {
+                return *this->_ptr;
+            }
+
+            constexpr pointer operator ->() const noexcept {
+                return this->_ptr;
+            }
+    };
+
+    template<typename T>
+    class unique_ptr<T[]> : public _unique_ptr_impl<T> {
+        /* A minimal implementation of std::unique_ptr, with no custom deleters. */
+
+        public:
+            using pointer   = T *;
+            using reference = T &;
+
+            constexpr unique_ptr(const pointer ptr) : _unique_ptr_impl<T>(ptr) { }
+
+            template<typename U>
+            requires (implicitly_convertible_to<U (*)[], T(*)[]>)
+            constexpr unique_ptr(unique_ptr<U[]> &&other) : _unique_ptr_impl<T>(other.release()) { }
+
+            template<typename U>
+            requires (implicitly_convertible_to<U (*)[], T(*)[]>)
+            constexpr unique_ptr &operator =(unique_ptr<U[]> &&rhs) noexcept {
+                /* Only check if assigning to self if 'rhs' is of the same type. */
+                if constexpr (same_as<U, T>) {
+                    CHECK_SELF(rhs);
+                }
+
+                if (!this->empty()) {
+                    delete[] this->_ptr;
+                }
+
+                this->_ptr = rhs.release();
+
+                return *this;
+            }
+
+            constexpr ~unique_ptr() noexcept {
+                if (!this->empty()) {
+                    delete[] this->_ptr;
+                }
+            }
+
+            template<typename U>
+            requires (implicitly_convertible_to<U (*)[], T (*)[]>)
+            constexpr void reset(const U *ptr = nullptr) noexcept {
+                const auto old_ptr = frd::exchange(this->_ptr, ptr);
+
+                if (old_ptr != nullptr) {
+                    delete[] old_ptr;
+                }
+            }
+
+            constexpr void reset() noexcept {
+                if (!this->empty()) {
+                    delete[] this->_ptr;
+                }
+
+                this->_ptr = nullptr;
+            }
+
+            constexpr reference operator [](frd::size_t index) const {
+                return this->_ptr[index];
+            }
+    };
+
+    template<typename T>
+    constexpr void swap(unique_ptr<T> &lhs, unique_ptr<T> &rhs) noexcept {
+        lhs.swap(rhs);
+    }
+
+    template<typename T, typename... Args>
+    requires (!array_type<T> && constructible_from<T, Args...>)
+    constexpr unique_ptr<T> make_unique(Args &&... args) {
+        return unique_ptr<T>(new T(frd::forward<Args>(args)...));
+    }
+
+    template<unbound_array T>
+    requires (default_constructible<remove_extent<T>>)
+    constexpr unique_ptr<T> make_unique(frd::size_t size) {
+        return unique_ptr<T>(new remove_extent<T>[size]{});
+    }
+
     template<typename T, typename Allocator = allocator<T>>
     requires (!array_type<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
     class scoped_ptr {

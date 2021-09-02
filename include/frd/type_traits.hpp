@@ -6,6 +6,8 @@
 
 namespace frd {
 
+    using _size_t = decltype(sizeof(int));
+
     template<auto v>
     struct constant_holder {
         using value_type = decltype(v);
@@ -39,8 +41,8 @@ namespace frd {
     template<typename T> constexpr inline bool is_unbound_array      = false;
     template<typename T> constexpr inline bool is_unbound_array<T[]> = true;
 
-    template<typename T>                constexpr inline bool is_bound_array       = false;
-    template<typename T, std::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
+    template<typename T>            constexpr inline bool is_bound_array       = false;
+    template<typename T, _size_t N> constexpr inline bool is_bound_array<T[N]> = true;
 
     /* Only templated variables that are forced to use STL APIs below. */
 
@@ -126,42 +128,40 @@ namespace frd {
     template<typename T, typename NewArg>
     using replace_first_template_arg = replace_leading_template_args<T, NewArg>;
 
-    /* Use 'auto' for BitSize because we don't know size_t yet. */
-    template<auto BitSize, auto Operator, typename... Types>
+    template<_size_t BitSize, auto Operator, typename... Types>
     struct _type_for_bit_size;
 
-    template<auto BitSize, auto Operator>
+    template<_size_t BitSize, auto Operator>
     struct _type_for_bit_size<BitSize, Operator> {
         static_assert(dependent_false<decltype(BitSize)>, "No type for specified bit size!");
     };
 
-    template<auto BitSize, auto Operator, typename Head, typename... Tail>
+    template<_size_t BitSize, auto Operator, typename Head, typename... Tail>
     requires (Operator(BITSIZEOF(Head), BitSize))
     struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : type_holder<Head> { };
 
-    template<auto BitSize, auto Operator, typename Head, typename... Tail>
+    template<_size_t BitSize, auto Operator, typename Head, typename... Tail>
     struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : _type_for_bit_size<BitSize, Operator, Tail...> { };
 
-    template<auto BitSize, auto Operator, typename... Types>
+    template<_size_t BitSize, auto Operator, typename... Types>
     using type_for_bit_size = typename _type_for_bit_size<BitSize, Operator, Types...>::type;
 
-    /* Use 'auto' for Size because we don't know size_t yet. */
-    template<auto Size, typename... Types>
+    template<_size_t Size, typename... Types>
     struct _type_with_size;
 
-    template<auto Size>
+    template<_size_t Size>
     struct _type_with_size<Size> {
         static_assert(dependent_false<decltype(Size)>, "No type with specified size!");
     };
 
-    template<auto Size, typename Head, typename... Tail>
+    template<_size_t Size, typename Head, typename... Tail>
     requires (sizeof(Head) == Size)
     struct _type_with_size<Size, Head, Tail...> : type_holder<Head> { };
 
-    template<auto Size, typename Head, typename... Tail>
+    template<_size_t Size, typename Head, typename... Tail>
     struct _type_with_size<Size, Head, Tail...> : _type_with_size<Size, Tail...> { };
 
-    template<auto Size, typename... Types>
+    template<_size_t Size, typename... Types>
     using type_with_size = typename _type_with_size<Size, Types...>::type;
 
     template<typename Source, typename Destination> struct _match_const                            : type_holder<Destination> { };
@@ -193,6 +193,20 @@ namespace frd {
 
     template<typename T>
     using remove_cv = remove_volatile<remove_const<T>>;
+
+    template<typename T> struct _remove_reference       : type_holder<T> { };
+    template<typename T> struct _remove_reference<T &>  : type_holder<T> { };
+    template<typename T> struct _remove_reference<T &&> : type_holder<T> { };
+
+    template<typename T>
+    using remove_reference = typename _remove_reference<T>::type;
+
+    template<typename T>            struct _remove_extent       : type_holder<T> { };
+    template<typename T>            struct _remove_extent<T[]>  : type_holder<T> { };
+    template<typename T, _size_t N> struct _remove_extent<T[N]> : type_holder<T> { };
+
+    template<typename T>
+    using remove_extent = typename _remove_extent<T>::type;
 
     template<typename T> struct _remove_signed   : type_holder<T> { };
     template<typename T> struct _remove_unsigned : type_holder<T> { };
@@ -267,13 +281,6 @@ namespace frd {
 
     template<typename T> using make_signed   = match_cv<T, typename _make_signed  <remove_cv<remove_signedness<T>>>::type>;
     template<typename T> using make_unsigned = match_cv<T, typename _make_unsigned<remove_cv<remove_signedness<T>>>::type>;
-
-    template<typename T> struct _remove_reference       : type_holder<T> { };
-    template<typename T> struct _remove_reference<T &>  : type_holder<T> { };
-    template<typename T> struct _remove_reference<T &&> : type_holder<T> { };
-
-    template<typename T>
-    using remove_reference = typename _remove_reference<T>::type;
 
     template<typename T>
     using add_const = const T;

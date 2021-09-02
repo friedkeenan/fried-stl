@@ -7,7 +7,14 @@
 
 namespace frd {
 
-    using size_t = decltype(sizeof(int));
+    /*
+        '_size_t' comes from type_traits.hpp, which needs it for certain
+        template parameters.
+
+        TODO: Separate out some types like 'size_t' into a different
+        header to avoid dependency gunkery like this?
+    */
+    using size_t = _size_t;
     static_assert(BITSIZEOF(size_t) >= 16, "Since C++11, size_t must be at least 16 bits wide");
 
     /* Could static_cast nullptr's, but 'declval' signals intent better. */
