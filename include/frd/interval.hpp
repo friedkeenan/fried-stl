@@ -27,7 +27,7 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_FROM_LEFT(iterator, ++, noexcept)
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++, noexcept)
 
                     constexpr iterator &operator --() noexcept requires (weakly_decrementable<Start>) {
                         this->_value--;
@@ -35,7 +35,7 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_FROM_LEFT(iterator, --, noexcept requires (weakly_decrementable<Start>))
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, noexcept requires (weakly_decrementable<Start>))
 
                     constexpr const Start &operator *() const noexcept {
                         return this->_value;
