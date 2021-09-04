@@ -1,25 +1,13 @@
 #pragma once
 
+#include <frd/bits/arithmetic_base.hpp>
+
 #include <frd/defines.hpp>
 #include <frd/functional.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>
 
 namespace frd {
-
-    /*
-        '_size_t' comes from type_traits.hpp, which needs it for certain
-        template parameters.
-
-        TODO: Separate out some types like 'size_t' into a different
-        header to avoid dependency gunkery like this?
-    */
-    using size_t = _size_t;
-    static_assert(FRD_BITSIZEOF(size_t) >= 16, "Since C++11, size_t must be at least 16 bits wide");
-
-    /* Could static_cast nullptr's, but 'declval' signals intent better. */
-    using ptrdiff_t = decltype(declval<int *>() - declval<int *>());
-    static_assert(FRD_BITSIZEOF(ptrdiff_t) >= 17, "Since C++11, ptrdiff_t must be at least 17 bits wide");
 
     template<size_t BitSize, auto Operator = equal_to>
     using int_for_bit_size = type_for_bit_size<BitSize, Operator,

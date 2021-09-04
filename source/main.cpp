@@ -5,6 +5,9 @@
 #include <frd/bit.hpp>
 #include <frd/tuple.hpp>
 #include <frd/memory.hpp>
+#include <frd/algorithm.hpp>
+#include <frd/interval.hpp>
+#include <frd/vector.hpp>
 
 static_assert(frd::tuple{1, 2} == frd::tuple{1, 2});
 
@@ -28,22 +31,34 @@ static_assert(frd::same_as<frd::remove_signedness<const volatile unsigned int>, 
 static_assert(frd::same_as<frd::make_signed<unsigned int>, signed int>);
 static_assert(frd::same_as<frd::make_unsigned<const volatile int>, const volatile unsigned int>);
 
+static_assert(frd::min(1, 2, 3, 0, 4, 4) == 0);
+
+static_assert(frd::range<frd::vector<int>>);
+
+static_assert(frd::same_as<frd::remove_cvref<const int &>, int>);
+
+static_assert(frd::range<frd::interval<int>>);
+
 consteval bool fuck() {
     struct S {
-        bool _shit = true;
+        bool value;
 
-        constexpr S() = default;
-        constexpr S(bool shit) : _shit(shit) { }
-
-        constexpr bool shit() const noexcept {
-            return this->_shit;
-        }
+        constexpr S(bool value) : value(value) { }
     };
 
-    auto data = frd::make_unique<S>(1);
-    const auto new_data = frd::move(data);
+    auto v = frd::vector<S>();
+    v.reserve(5);
 
-    return new_data->shit();
+    v.emplace_back(true);
+    v.emplace_back(false);
+    v.emplace_back(true);
+
+    v.pop_back();
+
+    v.resize(5, S(false));
+    v.clear();
+
+    return v.size() == 0 && v.capacity() == 5;
 }
 
 static_assert(fuck());
@@ -58,7 +73,7 @@ int main(int argc, char **argv) {
     const auto &[x, y] = fuck;
     FRD_UNUSED(x, y);
 
-    for (const auto &i : fuck) {
+    for (const auto i : fuck) {
         std::printf("%d\n", i);
     }
 

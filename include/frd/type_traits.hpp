@@ -2,11 +2,11 @@
 
 #include <type_traits>
 
+#include <frd/bits/arithmetic_base.hpp>
+
 #include <frd/defines.hpp>
 
 namespace frd {
-
-    using _size_t = decltype(sizeof(int));
 
     template<auto v>
     struct constant_holder {
@@ -41,8 +41,14 @@ namespace frd {
     template<typename T> constexpr inline bool is_unbound_array      = false;
     template<typename T> constexpr inline bool is_unbound_array<T[]> = true;
 
-    template<typename T>            constexpr inline bool is_bound_array       = false;
-    template<typename T, _size_t N> constexpr inline bool is_bound_array<T[N]> = true;
+    template<typename T>                constexpr inline bool is_bound_array       = false;
+    template<typename T, frd::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
+
+    template<typename T, frd::size_t Dim = 0>            constexpr inline frd::size_t extent            = 0;
+    template<typename T>                                 constexpr inline frd::size_t extent<T[],  0>   = 0;
+    template<typename T, frd::size_t Dim>                constexpr inline frd::size_t extent<T[],  Dim> = extent<T, Dim - 1>;
+    template<typename T, frd::size_t N>                  constexpr inline frd::size_t extent<T[N], 0>   = N;
+    template<typename T, frd::size_t N, frd::size_t Dim> constexpr inline frd::size_t extent<T[N], Dim> = extent<T, Dim - 1>;
 
     /* Only templated variables that are forced to use STL APIs below. */
 
@@ -93,17 +99,17 @@ namespace frd {
     template<typename T>
     using first_template_arg = typename _first_template_arg<T>::type;
 
-    template<size_t N, typename... Args>
+    template<frd::size_t N, typename... Args>
     struct _remove_leading_args;
 
-    template<size_t N, typename Head, typename... Tail>
+    template<frd::size_t N, typename Head, typename... Tail>
     requires (N != 0)
     struct _remove_leading_args<N, Head, Tail...> : _remove_leading_args<N - 1, Tail...> { };
 
     template<typename... Args>
     struct _remove_leading_args<0, Args...> : type_holder<type_list<Args...>> { };
 
-    template<size_t N, typename... Args>
+    template<frd::size_t N, typename... Args>
     using remove_leading_args = typename _remove_leading_args<N, Args...>::type;
 
     template<template<typename...> typename Template, typename NewArgs, typename TailArgs>
@@ -128,40 +134,40 @@ namespace frd {
     template<typename T, typename NewArg>
     using replace_first_template_arg = replace_leading_template_args<T, NewArg>;
 
-    template<_size_t BitSize, auto Operator, typename... Types>
+    template<frd::size_t BitSize, auto Operator, typename... Types>
     struct _type_for_bit_size;
 
-    template<_size_t BitSize, auto Operator>
+    template<frd::size_t BitSize, auto Operator>
     struct _type_for_bit_size<BitSize, Operator> {
         static_assert(dependent_false<decltype(BitSize)>, "No type for specified bit size!");
     };
 
-    template<_size_t BitSize, auto Operator, typename Head, typename... Tail>
+    template<frd::size_t BitSize, auto Operator, typename Head, typename... Tail>
     requires (Operator(FRD_BITSIZEOF(Head), BitSize))
     struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : type_holder<Head> { };
 
-    template<_size_t BitSize, auto Operator, typename Head, typename... Tail>
+    template<frd::size_t BitSize, auto Operator, typename Head, typename... Tail>
     struct _type_for_bit_size<BitSize, Operator, Head, Tail...> : _type_for_bit_size<BitSize, Operator, Tail...> { };
 
-    template<_size_t BitSize, auto Operator, typename... Types>
+    template<frd::size_t BitSize, auto Operator, typename... Types>
     using type_for_bit_size = typename _type_for_bit_size<BitSize, Operator, Types...>::type;
 
-    template<_size_t Size, typename... Types>
+    template<frd::size_t Size, typename... Types>
     struct _type_with_size;
 
-    template<_size_t Size>
+    template<frd::size_t Size>
     struct _type_with_size<Size> {
         static_assert(dependent_false<decltype(Size)>, "No type with specified size!");
     };
 
-    template<_size_t Size, typename Head, typename... Tail>
+    template<frd::size_t Size, typename Head, typename... Tail>
     requires (sizeof(Head) == Size)
     struct _type_with_size<Size, Head, Tail...> : type_holder<Head> { };
 
-    template<_size_t Size, typename Head, typename... Tail>
+    template<frd::size_t Size, typename Head, typename... Tail>
     struct _type_with_size<Size, Head, Tail...> : _type_with_size<Size, Tail...> { };
 
-    template<_size_t Size, typename... Types>
+    template<frd::size_t Size, typename... Types>
     using type_with_size = typename _type_with_size<Size, Types...>::type;
 
     template<typename Source, typename Destination> struct _match_const                            : type_holder<Destination> { };
@@ -201,9 +207,12 @@ namespace frd {
     template<typename T>
     using remove_reference = typename _remove_reference<T>::type;
 
-    template<typename T>            struct _remove_extent       : type_holder<T> { };
-    template<typename T>            struct _remove_extent<T[]>  : type_holder<T> { };
-    template<typename T, _size_t N> struct _remove_extent<T[N]> : type_holder<T> { };
+    template<typename T>
+    using remove_cvref = remove_cv<remove_reference<T>>;
+
+    template<typename T>                struct _remove_extent       : type_holder<T> { };
+    template<typename T>                struct _remove_extent<T[]>  : type_holder<T> { };
+    template<typename T, frd::size_t N> struct _remove_extent<T[N]> : type_holder<T> { };
 
     template<typename T>
     using remove_extent = typename _remove_extent<T>::type;
@@ -325,6 +334,15 @@ namespace frd {
 
     template<typename Default, template<typename...> typename Op, typename... Args>
     using detected_else = typename _detected_else<Default, Op, Args...>::type;
+
+    template<bool Condition, typename Success, typename Failure>
+    struct _condition;
+
+    template<typename Success, typename Failure> struct _condition<true,  Success, Failure> : type_holder<Success> { };
+    template<typename Success, typename Failure> struct _condition<false, Success, Failure> : type_holder<Failure> { };
+
+    template<bool Condition, typename Success, typename Failure>
+    using condition = typename _condition<Condition, Success, Failure>::type;
 
     /* Only operations on types that are forced to use STL APIs below. */
 

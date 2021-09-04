@@ -1,8 +1,10 @@
 #pragma once
 
 #include <type_traits>
+#include <concepts>
 
-#include <frd/utility.hpp>
+#include <frd/bits/utility_base.hpp>
+
 #include <frd/type_traits.hpp>
 
 namespace frd {
@@ -106,10 +108,19 @@ namespace frd {
     );
 
     template<typename T>
+    concept class_type = requires {
+        /* Check if you can have a member function for T. */
+        typename type_holder<int T:: *>;
+    };
+
+    template<typename T>
     concept incomplete = !requires {
         /* You cannot find the size of incomplete types. */
         sizeof(T);
     };
+
+    template<typename T>
+    concept referenceable = !void_type<T>;
 
     template<typename T, typename U>
     concept common_reference_with = (
@@ -126,7 +137,7 @@ namespace frd {
             const remove_reference<RHS> &
         >                                                &&
         requires(LHS lhs, RHS &&rhs) {
-            { lhs = forward<RHS>(rhs) } -> same_as<LHS>;
+            { lhs = frd::forward<RHS>(rhs) } -> same_as<LHS>;
         }
     );
 
@@ -174,19 +185,48 @@ namespace frd {
     concept move_assignable = assignable_from<T &, T &&>;
 
     template<typename T>
-    concept copy_constructible =
-        move_constructible<T> &&
+    concept movable = (
+        object<T>               &&
+        move_constructible<T>   &&
+        assignable_from<T &, T> &&
+        std::swappable<T>
+    );
+
+    template<typename T>
+    concept copy_constructible = (
+        move_constructible<T>                                            &&
         constructible_from<T, T &>       && convertible_to<T &,       T> &&
         constructible_from<T, const T &> && convertible_to<const T &, T> &&
-        constructible_from<T, const T>   && convertible_to<const T,   T>;
+        constructible_from<T, const T>   && convertible_to<const T,   T>
+    );
 
     template<typename T>
     concept copy_assignable = move_assignable<T> && assignable_from<T &, const T &>;
 
-    template<typename T, typename ToForward>
-    concept forwarder = same_as<remove_reference<T>, ToForward>;
+    template<typename T>
+    concept copyable = (
+        copy_constructible<T>           &&
+        movable<T>                      &&
+        assignable_from<T &, T &>       &&
+        assignable_from<T &, const T &> &&
+        assignable_from<T &, const T>
+    );
 
-    /* Only concepts that are forced to use std APIs below. */
+    template<typename T>
+    concept semiregular = copyable<T> && default_constructible<T>;
+
+    template<typename T, typename U>
+    concept weakly_equality_comparable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t == u } -> boolean_testable;
+        { t != u } -> boolean_testable;
+        { u == t } -> boolean_testable;
+        { u != t } -> boolean_testable;
+    };
+
+    template<typename T, typename ToForward>
+    concept forwarder_for = same_as<remove_cvref<T>, ToForward>;
+
+    /* Only concepts that are forced to use STL APIs below. */
 
     template<typename T>
     concept trivially_copyable = std::is_trivially_copyable_v<T>;

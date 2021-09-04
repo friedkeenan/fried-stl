@@ -206,6 +206,20 @@ namespace frd {
         }
     };
 
+    template<typename Allocator>
+    concept allocator_type = requires {
+        typename allocator_traits<Allocator>;
+    };
+
+    template<typename Allocator, typename Value>
+    concept allocator_for = allocator_type<Allocator> && same_as<typename allocator_traits<Allocator>::value_type, Value>;
+
+    template<typename Allocator, typename... Args>
+    concept allocator_value_constructible_from = allocator_type<Allocator> &&
+        requires(Allocator &alloc, typename allocator_traits<Allocator>::pointer location, Args &&... args) {
+            allocator_traits<Allocator>::construct(alloc, location, frd::forward<Args>(args)...);
+        };
+
     template<typename T>
     class allocator {
         public:
@@ -462,8 +476,8 @@ namespace frd {
         return unique_ptr<T>(new remove_extent<T>[size]{});
     }
 
-    template<typename T, typename Allocator = allocator<T>>
-    requires (!array_type<T> && same_as<T, typename allocator_traits<Allocator>::value_type>)
+    template<typename T, allocator_for<T> Allocator = allocator<T>>
+    requires (!array_type<T>)
     class scoped_ptr {
         /*
             scoped_ptr does not have an array overload, nor does it allow
