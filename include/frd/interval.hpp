@@ -2,8 +2,9 @@
 
 #include <memory>
 
-#include <frd/type_traits.hpp>
 #include <frd/ranges.hpp>
+#include <frd/type_traits.hpp>
+#include <frd/concepts.hpp>
 
 namespace frd {
 
@@ -47,6 +48,7 @@ namespace frd {
 
                     constexpr auto operator <=>(const iterator &rhs) const noexcept = default;
 
+                    /* Needed because of the '_sentinel' overload. */
                     constexpr bool operator ==(const iterator &rhs) const noexcept {
                         return (*this <=> rhs) == 0;
                     }
@@ -70,7 +72,10 @@ namespace frd {
                 }
             };
 
-            /* If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel. */
+            /*
+                If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel.
+                This allows certain optimizations with regards to iterator operations.
+            */
             using sentinel = condition<same_as<Start, End>, iterator, _sentinel>;
 
             Start _start;

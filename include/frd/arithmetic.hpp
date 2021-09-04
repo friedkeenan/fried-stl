@@ -60,4 +60,37 @@ namespace frd {
     using float64_t  = float_for_bit_size<64>;
     using float128_t = float_for_bit_size<128>;
 
+    inline namespace arithmetic_literals {
+
+        #define INTEGRAL_LITERAL(cls, literal)                                   \
+            constexpr cls operator ""_##literal(unsigned long long n) noexcept { \
+                return static_cast<cls>(n);                                      \
+            }
+
+        INTEGRAL_LITERAL(frd::size_t, sz)
+
+        INTEGRAL_LITERAL(frd::int8_t,   i8)
+        INTEGRAL_LITERAL(frd::uint8_t,  u8)
+        INTEGRAL_LITERAL(frd::int16_t,  i16)
+        INTEGRAL_LITERAL(frd::uint16_t, u16)
+        INTEGRAL_LITERAL(frd::int32_t,  i32)
+        INTEGRAL_LITERAL(frd::uint32_t, u32)
+        INTEGRAL_LITERAL(frd::int64_t,  i64)
+        INTEGRAL_LITERAL(frd::uint64_t, u64)
+
+        #undef INTEGRAL_LITERAL
+
+        #define FLOAT_LITERAL(cls, literal)                               \
+            constexpr cls operator ""_##literal(long double f) noexcept { \
+                return static_cast<cls>(f);                               \
+            }
+
+        FLOAT_LITERAL(frd::float32_t,  f32)
+        FLOAT_LITERAL(frd::float64_t,  f64)
+        FLOAT_LITERAL(frd::float128_t, f128)
+
+        #undef FLOAT_LITERAL
+
+    }
+
 }

@@ -223,6 +223,9 @@ namespace frd {
         { u != t } -> boolean_testable;
     };
 
+    template<typename T>
+    concept equality_comparable = weakly_equality_comparable_with<T, T>;
+
     template<typename T, typename ToForward>
     concept forwarder_for = same_as<remove_cvref<T>, ToForward>;
 

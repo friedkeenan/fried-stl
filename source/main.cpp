@@ -9,6 +9,8 @@
 #include <frd/interval.hpp>
 #include <frd/vector.hpp>
 
+using namespace frd::arithmetic_literals;
+
 static_assert(frd::tuple{1, 2} == frd::tuple{1, 2});
 
 static_assert(sizeof(frd::size_t)    == 8);
@@ -38,6 +40,7 @@ static_assert(frd::range<frd::vector<int>>);
 static_assert(frd::same_as<frd::remove_cvref<const int &>, int>);
 
 static_assert(frd::range<frd::interval<int>>);
+static_assert(frd::same_as<decltype(frd::interval(0_sz, 5)), frd::interval<frd::size_t, int>>);
 
 consteval bool fuck() {
     struct S {
@@ -73,7 +76,7 @@ int main(int argc, char **argv) {
     const auto &[x, y] = fuck;
     FRD_UNUSED(x, y);
 
-    for (const auto i : fuck) {
+    for (const auto i : frd::interval(5)) {
         std::printf("%d\n", i);
     }
 
