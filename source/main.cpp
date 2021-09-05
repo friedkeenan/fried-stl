@@ -44,13 +44,14 @@ static_assert(frd::same_as<decltype(frd::interval(0_sz, 5)), frd::interval<frd::
 
 consteval bool fuck() {
     struct S {
-        bool value;
+        bool value = false;
 
+        S() = delete;
         constexpr S(bool value) : value(value) { }
     };
 
     auto v = frd::vector<S>();
-    v.reserve(5);
+    v.emplace(v.end(), true);
 
     v.emplace_back(true);
     v.emplace_back(false);
@@ -61,7 +62,9 @@ consteval bool fuck() {
     v.resize(5, S(false));
     v.clear();
 
-    return v.size() == 0 && v.capacity() == 5;
+    v.emplace(v.begin(), true);
+
+    return v[0].value && v.capacity() == 5;
 }
 
 static_assert(fuck());

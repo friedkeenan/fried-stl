@@ -215,10 +215,15 @@ namespace frd {
     concept allocator_for = allocator_type<Allocator> && same_as<typename allocator_traits<Allocator>::value_type, Value>;
 
     template<typename Allocator, typename... Args>
-    concept allocator_value_constructible_from = allocator_type<Allocator> &&
+    concept allocator_value_constructible_from = (
+        allocator_type<Allocator> &&
         requires(Allocator &alloc, typename allocator_traits<Allocator>::pointer location, Args &&... args) {
             allocator_traits<Allocator>::construct(alloc, location, frd::forward<Args>(args)...);
-        };
+        }
+    );
+
+    template<typename Allocator>
+    concept allocator_value_default_constructible = allocator_value_constructible_from<Allocator>;
 
     template<typename T>
     class allocator {

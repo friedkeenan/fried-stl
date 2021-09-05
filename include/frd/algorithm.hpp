@@ -4,7 +4,7 @@
 
 namespace frd {
 
-    template<typename T, same_as<T>... Rest>
+    template<less_than_comparable T, same_as<T>... Rest>
     constexpr T min(const T &first, const Rest &... rest) noexcept {
         if constexpr (sizeof...(Rest) == 0) {
             return first;

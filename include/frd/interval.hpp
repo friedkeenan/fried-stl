@@ -17,6 +17,11 @@ namespace frd {
 
             class iterator {
                 public:
+                    using value_type      = Start;
+                    using pointer         = const Start *;
+                    using reference       = const Start &;
+                    using difference_type = iter_difference<Start>;
+
                     Start _value;
 
                     constexpr iterator() = default;
@@ -37,6 +42,42 @@ namespace frd {
                     }
 
                     constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, noexcept requires (weakly_decrementable<Start>))
+
+                    template<typename Delta>
+                    requires (weakly_addable_with<Start, Delta>)
+                    constexpr iterator operator +(const Delta &delta) const noexcept {
+                        return iterator(this->_value + delta);
+                    }
+
+                    template<typename Delta>
+                    requires (in_place_addable_with<Start, Delta> || (weakly_addable_with<Start, Delta> && copy_assignable<Start>))
+                    constexpr iterator &operator +=(const Delta &delta) noexcept {
+                        if constexpr (in_place_addable_with<Start, Delta>) {
+                            this->_value += delta;
+                        } else {
+                            this->_value = (this->_value + delta);
+                        }
+
+                        return *this;
+                    }
+
+                    template<typename Delta>
+                    requires (weakly_subtractable_with<Start, Delta>)
+                    constexpr iterator operator -(const Delta &delta) const noexcept {
+                        return iterator(this->_value - delta);
+                    }
+
+                    template<typename Delta>
+                    requires (in_place_subtractable_with<Start, Delta> || (weakly_subtractable_with<Start, Delta> && copy_assignable<Start>))
+                    constexpr iterator &operator +=(const Delta &delta) noexcept {
+                        if constexpr (in_place_subtractable_with<Start, Delta>) {
+                            this->_value -= delta;
+                        } else {
+                            this->_value = (this->_value - delta);
+                        }
+
+                        return *this;
+                    }
 
                     constexpr const Start &operator *() const noexcept {
                         return this->_value;
@@ -85,6 +126,8 @@ namespace frd {
 
             constexpr interval(const Start &start, const End &end) : _start(start), _end(end) { }
 
+            /* TODO: Add 'subinterval' method basically just for fun. */
+
             constexpr iterator begin() const noexcept {
                 return iterator(this->_start);
             }
@@ -96,5 +139,7 @@ namespace frd {
 
     template<integral T>
     interval(T) -> interval<T, T>;
+
+    /* TODO: Enable borrowed range. */
 
 }

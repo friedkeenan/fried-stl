@@ -159,12 +159,13 @@ namespace frd {
         );
 
     template<typename T, typename... Args>
-    concept constructible_from =
-        destructible<T> &&
-        (reference<T> || object<T>) &&
+    concept constructible_from = (
+        destructible<T>                     &&
+        (reference<T> || object<T>)         &&
         requires(Args &&... args) {
-            T(forward<Args>(args)...);
-        };
+            T(frd::forward<Args>(args)...);
+        }
+    );
 
     template<typename T>
     concept default_constructible = constructible_from<T> && requires {
@@ -225,6 +226,43 @@ namespace frd {
 
     template<typename T>
     concept equality_comparable = weakly_equality_comparable_with<T, T>;
+
+    template<typename T, typename U>
+    concept weakly_less_than_comparable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t < u } -> boolean_testable;
+        { u < t } -> boolean_testable;
+    };
+
+    template<typename T>
+    concept less_than_comparable = weakly_less_than_comparable_with<T, T>;
+
+    template<typename T, typename U, typename Result = remove_reference<T>>
+    concept weakly_addable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t + u } -> same_as<Result>;
+        { u + t } -> same_as<Result>;
+    };
+
+    template<typename T>
+    concept addable = weakly_addable_with<T, T>;
+
+    template<typename T, typename U>
+    concept in_place_addable_with = requires(remove_reference<T> &t, U u) {
+        { t += u } -> same_as<remove_reference<T> &>;
+    };
+
+    template<typename T, typename U, typename Result = remove_reference<T>>
+    concept weakly_subtractable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t - u } -> same_as<Result>;
+        { u - t } -> same_as<Result>;
+    };
+
+    template<typename T>
+    concept subtractable = weakly_subtractable_with<T, T>;
+
+    template<typename T, typename U>
+    concept in_place_subtractable_with = requires(remove_reference<T> &t, U u) {
+        { t -= u } -> same_as<remove_reference<T> &>;
+    };
 
     template<typename T, typename ToForward>
     concept forwarder_for = same_as<remove_cvref<T>, ToForward>;

@@ -69,25 +69,16 @@ namespace frd {
 
                 const auto new_data = _allocator_traits::allocate(this->_allocator, new_capacity);
 
-                /* If we're empty, we don't need to worry about moving data. */
-                if (this->empty()) {
-                    this->_free_data();
-
-                    this->_data     = new_data;
-                    this->_capacity = new_capacity;
-
-                    return;
-                }
-
                 /* Move each element into its new location. */
                 auto new_location = new_data;
                 for (auto &elem : *this) {
                     _allocator_traits::construct(this->_allocator, new_location, frd::move(elem));
+                    _allocator_traits::destroy  (this->_allocator, std::addressof(elem));
 
                     new_location++;
                 }
 
-                this->_cleanup_data();
+                this->_free_data();
 
                 this->_data     = new_data;
                 this->_capacity = new_capacity;
@@ -105,6 +96,11 @@ namespace frd {
             template<typename... Args>
             requires (allocator_value_constructible_from<Allocator, Args...>)
             constexpr reference emplace_back(Args &&... args) {
+                /*
+                    We could call 'this->emplace(this->end(), ...)', but that would lead
+                    to slightly suboptimal performance, and this code is easier to understand.
+                */
+
                 /* We call '_reserve_impl' to avoid checks of current capacity. */
                 if (this->_capacity == 0) {
                     this->_reserve_impl(1);
@@ -122,6 +118,61 @@ namespace frd {
             template<forwarder_for<T> TFwd>
             constexpr void push_back(TFwd &&obj) {
                 this->emplace_back(frd::forward<TFwd>(obj));
+            }
+
+            template<typename... Args>
+            requires (allocator_value_constructible_from<Allocator, Args...>)
+            constexpr iterator emplace(const const_iterator pos, Args &&... args) {
+                const auto emplace_offset = pos - this->begin();
+
+                if (this->_capacity == 0) {
+                    /* Use '_reserve_impl' to avoid capacity checks. */
+
+                    this->_reserve_impl(1);
+                } else if (this->_size + 1 > this->_capacity) {
+                    /* Do our own reserve so we don't move our elements more than we need to. */
+
+                    const auto new_capacity = NewCapacityRatio * this->_capacity;
+                    const auto new_data     = _allocator_traits::allocate(this->_allocator, NewCapacityRatio * this->_capacity);
+
+                    auto new_location = new_data;
+                    for (auto elem_it : interval(this->begin(), this->end())) {
+                        /* Skip the location we're going to be putting the new element. */
+                        if (elem_it == pos) {
+                            new_location++;
+                        }
+
+                        _allocator_traits::construct(this->_allocator, new_location, frd::move(*elem_it));
+                        _allocator_traits::destroy  (this->_allocator, frd::to_address(elem_it));
+
+                        new_location++;
+                    }
+
+                    this->_free_data();
+
+                    this->_data     = new_data;
+                    this->_capacity = new_capacity;
+                } else if (!this->empty()) {
+                    /* We do not need to move anything if we're empty. */
+
+                    /*
+                        Loop starting from the end so we can just move each element over one
+                        without overwriting any other element.
+
+                        TODO: Reverse interval over these iterators would be preferable.
+                    */
+                    for (auto elem_it = this->end() - 1; elem_it != pos - 1; elem_it--) {
+                        const auto elem_addr = frd::to_address(elem_it);
+
+                        _allocator_traits::construct(this->_allocator, elem_addr + 1, frd::move(*elem_it));
+                        _allocator_traits::destroy  (this->_allocator, elem_addr);
+                    }
+                }
+
+                _allocator_traits::construct(this->_allocator, this->_data + emplace_offset, frd::forward<Args>(args)...);
+                this->_size += 1;
+
+                return this->begin() + emplace_offset;
             }
 
             constexpr void pop_back() {
@@ -144,6 +195,10 @@ namespace frd {
                 'T' is not default constructible.
             */
             constexpr void shrink_size(const size_type new_size) {
+                if (new_size >= this->_size) {
+                    return;
+                }
+
                 for (const auto i : interval(new_size, this->_size)) {
                     _allocator_traits::destroy(this->_allocator, this->_data + i);
                 }
@@ -159,14 +214,14 @@ namespace frd {
                 this->shrink_size(0);
             }
 
-            constexpr void resize(const size_type new_size) {
+            constexpr void resize(const size_type new_size) requires (allocator_value_default_constructible<Allocator>) {
                 if (new_size < this->_size) {
                     this->shrink_size(new_size);
                 } else {
-                    for (const auto i : interval(this->_size, new_size)) {
-                        FRD_UNUSED(i);
+                    this->reserve(new_size);
 
-                        this->emplace_back();
+                    for (const auto i : interval(this->_size, new_size)) {
+                        _allocator_traits::construct(this->_allocator, this->_data + i);
                     }
                 }
             }
@@ -175,10 +230,10 @@ namespace frd {
                 if (new_size < this->_size) {
                     this->shrink_size(new_size);
                 } else {
-                    for(const auto i : interval(this->_size, new_size)) {
-                        FRD_UNUSED(i);
+                    this->reserve(new_size);
 
-                        this->push_back(value);
+                    for(const auto i : interval(this->_size, new_size)) {
+                        _allocator_traits::construct(this->_allocator, this->_data + i, value);
                     }
                 }
             }
