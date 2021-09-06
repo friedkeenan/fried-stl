@@ -7,6 +7,7 @@
 #include <frd/memory.hpp>
 #include <frd/algorithm.hpp>
 #include <frd/interval.hpp>
+#include <frd/array.hpp>
 #include <frd/vector.hpp>
 
 using namespace frd::arithmetic_literals;
@@ -42,6 +43,11 @@ static_assert(frd::same_as<frd::remove_cvref<const int &>, int>);
 static_assert(frd::range<frd::interval<int>>);
 static_assert(frd::same_as<decltype(frd::interval(0_sz, 5)), frd::interval<frd::size_t, int>>);
 
+static_assert(frd::range<frd::array<int, 2>>);
+static_assert(frd::array{1, 2} == frd::array{1, 2});
+static_assert(frd::nothrow_swappable<frd::array<int, 2>>);
+static_assert(frd::to_array<char>({1, 2, 3}) == frd::array<char, 3>{1, 2, 3});
+
 consteval bool fuck() {
     struct S {
         bool value = false;
@@ -74,12 +80,12 @@ static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 int main(int argc, char **argv) {
     FRD_UNUSED(argc, argv);
 
-    const auto fuck = frd::tuple{1, 2};
+    const auto fuck = frd::array{1, 2};
 
     const auto &[x, y] = fuck;
-    FRD_UNUSED(x, y);
+    std::printf("%d %d\n", x, y);
 
-    for (const auto i : frd::interval(5)) {
+    for (const auto i : fuck) {
         std::printf("%d\n", i);
     }
 

@@ -117,7 +117,7 @@ namespace frd {
                 If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel.
                 This allows certain optimizations with regards to iterator operations.
             */
-            using sentinel = condition<same_as<Start, End>, iterator, _sentinel>;
+            using sentinel = conditional<same_as<Start, End>, iterator, _sentinel>;
 
             Start _start;
             End   _end;

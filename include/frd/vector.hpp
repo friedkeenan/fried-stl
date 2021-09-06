@@ -11,16 +11,16 @@ namespace frd {
 
     /* TODO: Decide whether to do vector<bool> specialization. */
 
-    template<typename T, allocator_for<T> Allocator = allocator<T>>
-    requires (copy_assignable<T> && copy_constructible<T>)
+    template<typename Element, allocator_for<Element> Allocator = allocator<Element>>
+    requires (copy_assignable<Element> && copy_constructible<Element>)
     class vector {
         public:
             using _allocator_traits = allocator_traits<Allocator>;
 
             using allocator_type  = Allocator;
-            using value_type      = T;
-            using reference       = T &;
-            using const_reference = const T &;
+            using value_type      = Element;
+            using reference       = Element &;
+            using const_reference = const Element &;
             using pointer         = typename _allocator_traits::pointer;
             using const_pointer   = typename _allocator_traits::const_pointer;
 
@@ -115,9 +115,9 @@ namespace frd {
                 return *location;
             }
 
-            template<forwarder_for<T> TFwd>
-            constexpr void push_back(TFwd &&obj) {
-                this->emplace_back(frd::forward<TFwd>(obj));
+            template<forwarder_for<Element> ElementFwd>
+            constexpr void push_back(ElementFwd &&obj) {
+                this->emplace_back(frd::forward<ElementFwd>(obj));
             }
 
             template<typename... Args>
@@ -143,7 +143,7 @@ namespace frd {
                         }
 
                         _allocator_traits::construct(this->_allocator, new_location, frd::move(*elem_it));
-                        _allocator_traits::destroy  (this->_allocator, frd::to_address(elem_it));
+                        _allocator_traits::destroy  (this->_allocator, pointer{elem_it});
 
                         new_location++;
                     }
@@ -162,7 +162,7 @@ namespace frd {
                         TODO: Reverse interval over these iterators would be preferable.
                     */
                     for (auto elem_it = this->end() - 1; elem_it != pos - 1; elem_it--) {
-                        const auto elem_addr = frd::to_address(elem_it);
+                        const auto elem_addr = pointer{elem_it};
 
                         _allocator_traits::construct(this->_allocator, elem_addr + 1, frd::move(*elem_it));
                         _allocator_traits::destroy  (this->_allocator, elem_addr);
@@ -192,7 +192,7 @@ namespace frd {
 
             /*
                 Allows shrinking size without passing an extra value when
-                'T' is not default constructible.
+                'Element' is not default constructible.
             */
             constexpr void shrink_size(const size_type new_size) {
                 if (new_size >= this->_size) {
@@ -226,7 +226,7 @@ namespace frd {
                 }
             }
 
-            constexpr void resize(const size_type new_size, const T &value) {
+            constexpr void resize(const size_type new_size, const Element &value) {
                 if (new_size < this->_size) {
                     this->shrink_size(new_size);
                 } else {

@@ -1,9 +1,8 @@
 #pragma once
 
-#include <utility>
 #include <memory>
 
-#include <frd/type_traits.hpp>
+#include <frd/bits/type_traits_base.hpp>
 
 namespace frd {
 
@@ -33,14 +32,6 @@ namespace frd {
         obj = forward<U>(new_value);
 
         return old_value;
-    }
-
-    /* A utility function that will use ADL-discovered swap or std::swap. */
-    template<typename LHS, typename RHS>
-    constexpr void swap(LHS &&lhs, RHS &&rhs) {
-        using std::swap;
-
-        swap(forward<LHS>(lhs), forward<RHS>(rhs));
     }
 
     template<typename T>

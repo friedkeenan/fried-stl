@@ -1,20 +1,14 @@
 #pragma once
 
 #include <memory>
-#include <compare>
 #include <tuple>
 
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
+#include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 
 namespace frd {
-
-    template<typename T, typename U>
-    concept _tuple_comparable_impl = requires(const T &t, const U &u) {
-        { t < u } -> boolean_testable;
-        { u < t } -> boolean_testable;
-    };
 
     template<typename... Ts>
     class tuple;
@@ -32,11 +26,11 @@ namespace frd {
             template<typename CmpHead, typename... CmpTail>
             static consteval bool IsComparable() {
                 return (
-                    std::three_way_comparable_with<Head, CmpHead> ||
-                    _tuple_comparable_impl<Head, CmpHead>
+                    std::three_way_comparable_with<Head, CmpHead>   ||
+                    weakly_less_than_comparable_with<Head, CmpHead>
                 ) && ((
-                    std::three_way_comparable_with<Tail, CmpTail> ||
-                    _tuple_comparable_impl<Tail, CmpTail>
+                    std::three_way_comparable_with<Tail, CmpTail>   ||
+                    weakly_less_than_comparable_with<Tail, CmpTail>
                 ) && ...);
             }
 
@@ -103,23 +97,7 @@ namespace frd {
             template<typename RhsHead, typename... RhsTail>
             requires (IsComparable<RhsHead, RhsTail...>() && sizeof...(RhsTail) == sizeof...(Tail))
             constexpr auto operator <=>(const tuple<RhsHead, RhsTail...> &rhs) const {
-                constexpr auto synth_three_way = []<typename T, typename U>(const T &lhs, const U &rhs) {
-                    if constexpr (std::three_way_comparable_with<T, U>) {
-                        return lhs <=> rhs;
-                    } else {
-                        if (lhs < rhs) {
-                            return std::weak_ordering::less;
-                        }
-
-                        if (rhs < lhs) {
-                            return std::weak_ordering::greater;
-                        }
-
-                        return std::weak_ordering::equivalent;
-                    }
-                };
-
-                const auto cmp = synth_three_way(this->_head, rhs._head);
+                const auto cmp = synthetic_three_way_compare(this->_head, rhs._head);
 
                 if (cmp != 0) {
                     return cmp;
@@ -168,9 +146,7 @@ namespace std {
 
     /* Base case. */
     template<typename Head, typename... Tail>
-    struct tuple_element<0, frd::tuple<Head, Tail...>> {
-        using type = Head;
-    };
+    struct tuple_element<0, frd::tuple<Head, Tail...>> : frd::type_holder<Head> { };
 
     template<typename T, typename Head, typename... Tail>
     constexpr T &get(frd::tuple<Head, Tail...> &t) noexcept {

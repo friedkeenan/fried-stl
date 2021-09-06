@@ -56,7 +56,7 @@ namespace frd {
     template<typename R>
     concept _adl_begin = (class_type<remove_reference<R>> || enum_type<remove_reference<R>>) &&
         requires(R &r) {
-            { frd::decay(begin(r)) } -> iterator;
+            { frd::decay_copy(begin(r)) } -> iterator;
         };
 
     template<_maybe_borrowed_range R>
@@ -84,7 +84,7 @@ namespace frd {
     template<typename R>
     concept _adl_end = (class_type<remove_reference<R>> || enum_type<remove_reference<R>>) &&
         requires(R &r) {
-            { frd::decay(end(r)) } -> sentinel_for<range_iterator<R>>;
+            { frd::decay_copy(end(r)) } -> sentinel_for<range_iterator<R>>;
         };
 
     template<_maybe_borrowed_range R>
