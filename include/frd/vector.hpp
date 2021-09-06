@@ -133,7 +133,7 @@ namespace frd {
                     /* Do our own reserve so we don't move our elements more than we need to. */
 
                     const auto new_capacity = NewCapacityRatio * this->_capacity;
-                    const auto new_data     = _allocator_traits::allocate(this->_allocator, NewCapacityRatio * this->_capacity);
+                    const auto new_data     = _allocator_traits::allocate(this->_allocator, new_capacity);
 
                     auto new_location = new_data;
                     for (auto elem_it : interval(this->begin(), this->end())) {
