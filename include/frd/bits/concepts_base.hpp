@@ -6,7 +6,6 @@
 #include <frd/bits/type_traits_base.hpp>
 #include <frd/bits/utility_base.hpp>
 
-
 namespace frd {
 
     template<typename T, typename U>

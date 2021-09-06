@@ -136,7 +136,7 @@ namespace frd {
                     const auto new_data     = _allocator_traits::allocate(this->_allocator, new_capacity);
 
                     auto new_location = new_data;
-                    for (auto elem_it : interval(this->begin(), this->end())) {
+                    for (const auto elem_it : interval(this->begin(), this->end())) {
                         /* Skip the location we're going to be putting the new element. */
                         if (elem_it == pos) {
                             new_location++;

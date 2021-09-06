@@ -21,11 +21,13 @@ namespace frd {
             using iterator       = Head *;
             using const_iterator = const Head *;
 
-            static constexpr bool SameTypes = (frd::same_as<Head, Tail> && ...);
+            static constexpr bool SameTypes = (same_as<Head, Tail> && ...);
 
             template<typename CmpHead, typename... CmpTail>
-            static consteval bool IsComparable() {
+            static consteval bool _is_comparable() {
                 return (
+                    sizeof...(Tail) == sizeof...(CmpTail)
+                ) && (
                     std::three_way_comparable_with<Head, CmpHead>   ||
                     weakly_less_than_comparable_with<Head, CmpHead>
                 ) && ((
@@ -34,6 +36,14 @@ namespace frd {
                 ) && ...);
             }
 
+
+            /*
+                NOTE: Both libstdc++ and libc++ store the tail elements
+                before the head element, but in 'pair' they store the
+                first element before the second. The layout doesn't seem
+                to be mandated by the standard, but it makes more sense
+                to me to store the head element before the tail elements.
+            */
             Head _head;
             [[no_unique_address]] tuple<Tail...> _tail;
 
@@ -95,7 +105,7 @@ namespace frd {
             }
 
             template<typename RhsHead, typename... RhsTail>
-            requires (IsComparable<RhsHead, RhsTail...>() && sizeof...(RhsTail) == sizeof...(Tail))
+            requires (_is_comparable<RhsHead, RhsTail...>())
             constexpr auto operator <=>(const tuple<RhsHead, RhsTail...> &rhs) const {
                 const auto cmp = synthetic_three_way_compare(this->_head, rhs._head);
 
@@ -107,7 +117,7 @@ namespace frd {
             }
 
             template<typename RhsHead, typename... RhsTail>
-            requires (IsComparable<RhsHead, RhsTail...>() && sizeof...(RhsTail) == sizeof...(Tail))
+            requires (_is_comparable<RhsHead, RhsTail...>())
             constexpr bool operator ==(const tuple<RhsHead, RhsTail...> &rhs) const {
                 /* Equality only checks members, so can only be as efficient as <=>. */
 
