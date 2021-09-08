@@ -9,7 +9,7 @@
 
 namespace frd {
 
-    template<size_t BitSize, auto Operator = equal_to>
+    template<frd::size_t BitSize, auto Operator = equal_to>
     using int_for_bit_size = type_for_bit_size<BitSize, Operator,
         signed char,
         signed short,
@@ -18,7 +18,7 @@ namespace frd {
         signed long long
     >;
 
-    template<size_t BitSize, auto Operator = equal_to>
+    template<frd::size_t BitSize, auto Operator = equal_to>
     using uint_for_bit_size = type_for_bit_size<BitSize, Operator,
         unsigned char,
         unsigned short,
@@ -27,13 +27,13 @@ namespace frd {
         unsigned long long
     >;
 
-    template<size_t BitSize> using  int_fits_bit_size =  int_for_bit_size<BitSize, greater_equal>;
-    template<size_t BitSize> using uint_fits_bit_size = uint_for_bit_size<BitSize, greater_equal>;
+    template<frd::size_t BitSize> using  int_fits_bit_size =  int_for_bit_size<BitSize, greater_equal>;
+    template<frd::size_t BitSize> using uint_fits_bit_size = uint_for_bit_size<BitSize, greater_equal>;
 
     template<typename T> using  int_fits_type =  int_for_bit_size<FRD_BITSIZEOF(T), greater_equal>;
     template<typename T> using uint_fits_type = uint_for_bit_size<FRD_BITSIZEOF(T), greater_equal>;
 
-    template<size_t BitSize, auto Operator = equal_to>
+    template<frd::size_t BitSize, auto Operator = equal_to>
     using float_for_bit_size = type_for_bit_size<BitSize, Operator,
         float,
         double,

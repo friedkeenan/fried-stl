@@ -32,6 +32,9 @@ namespace frd {
     template<typename T, typename U> constexpr inline bool is_same       = false;
     template<typename T>             constexpr inline bool is_same<T, T> = true;
 
+    template<typename T> constexpr inline bool is_const          = false;
+    template<typename T> constexpr inline bool is_const<const T> = true;
+
     template<typename T> constexpr inline bool is_lvalue_reference      = false;
     template<typename T> constexpr inline bool is_lvalue_reference<T &> = true;
 
@@ -43,6 +46,12 @@ namespace frd {
 
     template<typename T>                constexpr inline bool is_bound_array       = false;
     template<typename T, frd::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
+
+    template<typename T>                     constexpr inline bool _is_const_function                     = false;
+    template<typename Ret, typename... Args> constexpr inline bool _is_const_function<Ret(Args...) const> = true;
+
+    template<typename T>                        constexpr inline bool _is_member_pointer                    = false;
+    template<typename MemberType, typename Cls> constexpr inline bool _is_member_pointer<MemberType Cls::*> = true;
 
     template<typename T, frd::size_t Dim = 0>            constexpr inline frd::size_t extent            = 0;
     template<typename T>                                 constexpr inline frd::size_t extent<T[],  0>   = 0;
@@ -210,6 +219,19 @@ namespace frd {
     template<typename T>
     using remove_cvref = remove_cv<remove_reference<T>>;
 
+    /*
+        Need the overloads for cv-qualified pointers as removing
+        a pointer off a non-pointer type should not remove cv qualifiers.
+    */
+    template<typename T> struct _remove_pointer                     : type_holder<T> { };
+    template<typename T> struct _remove_pointer<T *               > : type_holder<T> { };
+    template<typename T> struct _remove_pointer<T * const         > : type_holder<T> { };
+    template<typename T> struct _remove_pointer<T *       volatile> : type_holder<T> { };
+    template<typename T> struct _remove_pointer<T * const volatile> : type_holder<T> { };
+
+    template<typename T>
+    using remove_pointer = typename _remove_pointer<T>::type;
+
     template<typename T>                struct _remove_extent       : type_holder<T> { };
     template<typename T>                struct _remove_extent<T[]>  : type_holder<T> { };
     template<typename T, frd::size_t N> struct _remove_extent<T[N]> : type_holder<T> { };
@@ -343,6 +365,32 @@ namespace frd {
 
     template<bool Condition, typename Success, typename Failure>
     using conditional = typename _conditional<Condition, Success, Failure>::type;
+
+    template<typename T>
+    requires (_is_member_pointer<remove_cv<T>>)
+    struct _member_pointer_underlying;
+
+    template<typename MemberType, typename Cls>
+    struct _member_pointer_underlying<MemberType Cls::*> : type_holder<MemberType> { };
+
+    template<typename T>
+    using member_pointer_underlying = typename _member_pointer_underlying<remove_cv<T>>::type;
+
+    template<typename T>
+    requires (_is_member_pointer<remove_cv<T>>)
+    struct _member_pointer_class;
+
+    template<typename MemberType, typename Cls>
+    struct _member_pointer_class<MemberType Cls::*> : type_holder<Cls> { };
+
+    template<typename T>
+    using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
+
+    template<typename T>                     struct _to_non_const_function                     : type_holder<T> { };
+    template<typename Ret, typename... Args> struct _to_non_const_function<Ret(Args...) const> : type_holder<Ret(Args...)> { };
+
+    template<typename T>
+    using to_non_const_function = typename _to_non_const_function<T>::type;
 
     /* Only operations on types that are forced to use STL APIs below. */
 

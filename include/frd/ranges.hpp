@@ -63,8 +63,6 @@ namespace frd {
     requires (bound_array<remove_reference<R>> || _member_begin<R> || _adl_begin<R>)
     constexpr auto begin(R &&r) {
         if constexpr (bound_array<remove_reference<R>>) {
-            static_assert(lvalue_reference<R>, "Cannot return dangling iterator from array type!");
-
             return r + 0;
         } else if constexpr (_member_begin<R>) {
             return frd::forward<R>(r).begin();
@@ -91,8 +89,6 @@ namespace frd {
     requires (bound_array<remove_reference<R>> || _member_end<R> || _adl_end<R>)
     constexpr auto end(R &&r) {
         if constexpr (bound_array<remove_reference<R>>) {
-            static_assert(lvalue_reference<R>, "Cannot return dangling iterator from array type!");
-
             return r + extent<remove_reference<R>>;
         } else if constexpr (_member_end<R>) {
             return frd::forward<R>(r).end();
@@ -100,6 +96,9 @@ namespace frd {
             return end(frd::forward<R>(r));
         }
     }
+
+    template<typename R>
+    using range_sentinel = decltype(end(frd::declval<R &>()));
 
     template<typename R>
     concept range = requires(R &r) {

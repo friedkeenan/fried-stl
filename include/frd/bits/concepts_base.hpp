@@ -84,7 +84,14 @@ namespace frd {
     concept reference = lvalue_reference<T> || rvalue_reference<T>;
 
     template<typename T>
-    concept const_type = same_as<T, const T>;
+    concept pointer = !same_as<remove_pointer<T>, T>;
+
+    /*
+        Must be implemented through variable templates as adding 'const'
+        to a function type does not change anything, so you need specialization.
+    */
+    template<typename T>
+    concept const_type = is_const<T>;
 
     template<typename T>
     concept unbound_array = is_unbound_array<T>;
@@ -106,16 +113,34 @@ namespace frd {
     concept function = !const_type<const T> && !reference<T>;
 
     template<typename T>
+    concept const_function = function<T> && _is_const_function<T>;
+
+    template<typename T>
+    concept function_pointer = pointer<T> && function<remove_pointer<T>>;
+
+    template<typename T>
+    concept member_pointer = _is_member_pointer<remove_cv<T>>;
+
+    template<typename T>
+    concept member_function_pointer = member_pointer<T> && function<member_pointer_underlying<T>>;
+
+    template<typename T>
+    concept const_member_function_pointer = member_function_pointer<T> && const_function<member_pointer_underlying<T>>;
+
+    template<typename T>
+    concept member_object_pointer = member_pointer<T> && !function<member_pointer_underlying<T>>;
+
+    template<typename T>
     concept object = (
-        !function<T>      &&
-        !reference<T>     &&
+        !function<T>  &&
+        !reference<T> &&
         !void_type<T>
     );
 
     template<typename T>
     concept class_type = requires {
-        /* Check if you can have a member function for T. */
-        typename type_holder<int T:: *>;
+        /* Check if you can have a member pointer for T. */
+        typename type_holder<int T::*>;
     };
 
     template<typename T>
@@ -123,6 +148,9 @@ namespace frd {
         /* You cannot find the size of incomplete types. */
         sizeof(T);
     };
+
+    template<typename Derived, typename Base>
+    concept derived_from = class_type<Derived> && class_type<Base> && std::convertible_to<const volatile Derived *, const volatile Base *>;
 
     template<typename T>
     concept referenceable = !void_type<T>;
