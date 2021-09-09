@@ -134,6 +134,11 @@ namespace frd {
         )
             : _fn(frd::forward<FnOther>(fn)), _bound_args(frd::forward<BoundArgsOther>(bound_args)...) { }
 
+        /*
+            'bind_front' and 'bind_back' need to propagate lvalue and rvalue calls
+            appropriately, so we need to have four overloads of the call operator.
+        */
+
         template<typename... CallArgs>
         constexpr decltype(auto) operator ()(CallArgs &&... call_args) &
         noexcept(
