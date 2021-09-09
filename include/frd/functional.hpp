@@ -181,7 +181,7 @@ namespace frd {
                     frd::forward<CallArgs>(call_args)...
                 )
             )
-        ){
+        ) {
             return invoke(
                 frd::forward<Self>(self)._fn,
                 frd::get<I>(frd::forward<Self>(self)._bound_args)...,
