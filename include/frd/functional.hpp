@@ -24,7 +24,7 @@ namespace frd {
     template<typename Invocable, typename... Args>
     requires (_normal_callable<Invocable, Args...>)
     [[nodiscard]]
-    decltype(auto) invoke(Invocable &&inv, Args &&... args) noexcept(noexcept(frd::forward<Invocable>(inv)(frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(Invocable &&inv, Args &&... args) noexcept(noexcept(frd::forward<Invocable>(inv)(frd::forward<Args>(args)...))) {
         return frd::forward<Invocable>(inv)(frd::forward<Args>(args)...);
     }
 
@@ -37,14 +37,14 @@ namespace frd {
     template<member_object_pointer MemberObjPtr, typename Obj>
     requires (derived_from<remove_reference<Obj>, member_pointer_class<MemberObjPtr>>)
     [[nodiscard]]
-    decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, Obj &&obj) noexcept {
+    constexpr decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, Obj &&obj) noexcept {
         return forward<Obj>(obj).*mem_obj_ptr;
     }
 
     template<member_object_pointer MemberObjPtr, pointer ObjPtr>
     requires (derived_from<remove_pointer<ObjPtr>, member_pointer_class<MemberObjPtr>>)
     [[nodiscard]]
-    decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, const ObjPtr obj_ptr) noexcept {
+    constexpr decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, const ObjPtr obj_ptr) noexcept {
         return invoke(mem_obj_ptr, *obj_ptr);
     }
 
@@ -56,7 +56,10 @@ namespace frd {
         _normal_callable<to_non_const_function<member_pointer_underlying<MemberFuncPtr>>, Args...>
     )
     [[nodiscard]]
-    decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args) noexcept(noexcept((frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args)
+    noexcept(
+        noexcept((frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...))
+    ){
         return (frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...);
     }
 
@@ -66,7 +69,10 @@ namespace frd {
         _normal_callable<to_non_const_function<member_pointer_underlying<MemberFuncPtr>>, Args...>
     )
     [[nodiscard]]
-    decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args) noexcept(noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args)
+    noexcept(
+        noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))
+    ) {
         return invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...);
     }
 
@@ -79,7 +85,10 @@ namespace frd {
         _normal_callable<member_pointer_underlying<MemberFuncPtr>, Args...>
     )
     [[nodiscard]]
-    decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args) noexcept(noexcept((frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args)
+    noexcept(
+        noexcept((frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...))
+    ) {
         return (frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...);
     }
 
@@ -90,7 +99,10 @@ namespace frd {
         _normal_callable<member_pointer_underlying<MemberFuncPtr>, Args...>
     )
     [[nodiscard]]
-    decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args) noexcept(noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args)
+    noexcept(
+        noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))
+    ) {
         return invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...);
     }
 
@@ -106,7 +118,10 @@ namespace frd {
     template<typename Ret, typename Invocable, typename... Args>
     requires (invocable<Invocable, Args...>)
     [[nodiscard]]
-    Ret invoke_r(Invocable &&inv, Args &&... args) noexcept(noexcept(invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...))) {
+    constexpr Ret invoke_r(Invocable &&inv, Args &&... args)
+    noexcept(
+        noexcept(invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...))
+    ) {
         if constexpr (void_type<Ret>) {
             /* If 'Ret' is a void type, discard the return value. */
             static_cast<void>(invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...));
