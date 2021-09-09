@@ -28,33 +28,40 @@ namespace frd {
         return frd::forward<Invocable>(inv)(frd::forward<Args>(args)...);
     }
 
-    /*
-        For member pointers, the object they are being
-        used on must be derived from the class the member
-        pointer is for.
-    */
+    template<typename MemberObjPtr, typename Obj>
+    concept _member_obj_callable = member_object_pointer<MemberObjPtr> &&
+        requires(const MemberObjPtr mem_obj_ptr, Obj &&obj) {
+            frd::forward<Obj>(obj).*mem_obj_ptr;
+        };
 
-    template<member_object_pointer MemberObjPtr, typename Obj>
-    requires (derived_from<remove_reference<Obj>, member_pointer_class<MemberObjPtr>>)
+    template<typename MemberObjPtr, typename Obj>
+    requires (_member_obj_callable<MemberObjPtr, Obj>)
     [[nodiscard]]
     constexpr decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, Obj &&obj) noexcept {
-        return forward<Obj>(obj).*mem_obj_ptr;
+        return frd::forward<Obj>(obj).*mem_obj_ptr;
     }
 
-    template<member_object_pointer MemberObjPtr, pointer ObjPtr>
-    requires (derived_from<remove_pointer<ObjPtr>, member_pointer_class<MemberObjPtr>>)
+    template<typename MemberObjPtr, typename ObjPtr>
+    concept _member_obj_callable_with_ptr = member_object_pointer<MemberObjPtr> && pointer<ObjPtr> &&
+        requires(const MemberObjPtr mem_obj_ptr, const ObjPtr obj_ptr) {
+            obj_ptr->*mem_obj_ptr;
+        };
+
+    template<typename MemberObjPtr, typename ObjPtr>
+    requires (_member_obj_callable_with_ptr<MemberObjPtr, ObjPtr>)
     [[nodiscard]]
     constexpr decltype(auto) invoke(const MemberObjPtr mem_obj_ptr, const ObjPtr obj_ptr) noexcept {
-        return invoke(mem_obj_ptr, *obj_ptr);
+        return obj_ptr->*mem_obj_ptr;
     }
 
-    /* Const member functions can be used on const or non-const objects. */
+    template<typename MemberFuncPtr, typename Obj, typename... Args>
+    concept _member_func_callable = member_function_pointer<MemberFuncPtr> &&
+        requires(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args) {
+            (frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...);
+        };
 
-    template<const_member_function_pointer MemberFuncPtr, typename Obj, typename... Args>
-    requires (
-        derived_from<remove_reference<Obj>, member_pointer_class<MemberFuncPtr>>                   &&
-        _normal_callable<to_non_const_function<member_pointer_underlying<MemberFuncPtr>>, Args...>
-    )
+    template<typename MemberFuncPtr, typename Obj, typename... Args>
+    requires (_member_func_callable<MemberFuncPtr, Obj, Args...>)
     [[nodiscard]]
     constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args)
     noexcept(
@@ -63,47 +70,20 @@ namespace frd {
         return (frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...);
     }
 
-    template<const_member_function_pointer MemberFuncPtr, pointer ObjPtr, typename... Args>
-    requires (
-        derived_from<remove_pointer<ObjPtr>, member_pointer_class<MemberFuncPtr>>                  &&
-        _normal_callable<to_non_const_function<member_pointer_underlying<MemberFuncPtr>>, Args...>
-    )
+    template<typename MemberFuncPtr, typename ObjPtr, typename... Args>
+    concept _member_func_callable_with_ptr = member_function_pointer<MemberFuncPtr> && pointer<ObjPtr> &&
+        requires(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args) {
+            (obj_ptr->*mem_func_ptr)(frd::forward<Args>(args)...);
+        };
+
+    template<typename MemberFuncPtr, typename ObjPtr, typename... Args>
+    requires (_member_func_callable_with_ptr<MemberFuncPtr, ObjPtr, Args...>)
     [[nodiscard]]
     constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args)
     noexcept(
-        noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))
+        noexcept((obj_ptr->*mem_func_ptr)(frd::forward<Args>(args)...))
     ) {
-        return invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...);
-    }
-
-    /* Non-const member functions can only be used on non-const objects. */
-
-    template<member_function_pointer MemberFuncPtr, typename Obj, typename... Args>
-    requires (
-        derived_from<remove_reference<Obj>, member_pointer_class<MemberFuncPtr>> &&
-        !const_type<remove_reference<Obj>>                                       &&
-        _normal_callable<member_pointer_underlying<MemberFuncPtr>, Args...>
-    )
-    [[nodiscard]]
-    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, Obj &&obj, Args &&... args)
-    noexcept(
-        noexcept((frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...))
-    ) {
-        return (frd::forward<Obj>(obj).*mem_func_ptr)(frd::forward<Args>(args)...);
-    }
-
-    template<member_function_pointer MemberFuncPtr, pointer ObjPtr, typename... Args>
-    requires (
-        derived_from<remove_pointer<ObjPtr>, member_pointer_class<MemberFuncPtr>> &&
-        !const_type<remove_pointer<ObjPtr>>                                       &&
-        _normal_callable<member_pointer_underlying<MemberFuncPtr>, Args...>
-    )
-    [[nodiscard]]
-    constexpr decltype(auto) invoke(const MemberFuncPtr mem_func_ptr, const ObjPtr obj_ptr, Args &&... args)
-    noexcept(
-        noexcept(invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...))
-    ) {
-        return invoke(mem_func_ptr, *obj_ptr, frd::forward<Args>(args)...);
+        return (obj_ptr->*mem_func_ptr)(frd::forward<Args>(args)...);
     }
 
     template<typename Invocable, typename... Args>

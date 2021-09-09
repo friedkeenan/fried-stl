@@ -47,9 +47,6 @@ namespace frd {
     template<typename T>                constexpr inline bool is_bound_array       = false;
     template<typename T, frd::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
 
-    template<typename T>                     constexpr inline bool _is_const_function                     = false;
-    template<typename Ret, typename... Args> constexpr inline bool _is_const_function<Ret(Args...) const> = true;
-
     template<typename T>                        constexpr inline bool _is_member_pointer                    = false;
     template<typename MemberType, typename Cls> constexpr inline bool _is_member_pointer<MemberType Cls::*> = true;
 
@@ -385,12 +382,6 @@ namespace frd {
 
     template<typename T>
     using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
-
-    template<typename T>                     struct _to_non_const_function                     : type_holder<T> { };
-    template<typename Ret, typename... Args> struct _to_non_const_function<Ret(Args...) const> : type_holder<Ret(Args...)> { };
-
-    template<typename T>
-    using to_non_const_function = typename _to_non_const_function<T>::type;
 
     /* Only operations on types that are forced to use STL APIs below. */
 

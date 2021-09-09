@@ -113,9 +113,6 @@ namespace frd {
     concept function = !const_type<const T> && !reference<T>;
 
     template<typename T>
-    concept const_function = function<T> && _is_const_function<T>;
-
-    template<typename T>
     concept function_pointer = pointer<T> && function<remove_pointer<T>>;
 
     template<typename T>
@@ -123,9 +120,6 @@ namespace frd {
 
     template<typename T>
     concept member_function_pointer = member_pointer<T> && function<member_pointer_underlying<T>>;
-
-    template<typename T>
-    concept const_member_function_pointer = member_function_pointer<T> && const_function<member_pointer_underlying<T>>;
 
     template<typename T>
     concept member_object_pointer = member_pointer<T> && !function<member_pointer_underlying<T>>;
