@@ -24,10 +24,9 @@ namespace frd {
     };
 
     template<typename T, typename U>
-    concept _adl_swappable = (class_type<remove_reference<T>> || enum_type<remove_reference<T>>) &&
-        requires(T &&t, U &&u) {
-            swap(frd::forward<T>, frd::forward<U>);
-        };
+    concept _adl_swappable = adl_discoverable<T> && requires(T &&t, U &&u) {
+        swap(frd::forward<T>, frd::forward<U>);
+    };
 
     template<typename T, typename U>
     concept _normal_swappable = move_constructible<T> && assignable_from<T &, U &&> && assignable_from<U &, T &&>;
@@ -79,6 +78,40 @@ namespace frd {
 
     template<typename T>
     concept nothrow_swappable = nothrow_swappable_with<T, T>;
+
+    template<typename T>
+    concept _member_getable = requires(T &&t) {
+        frd::forward<T>(t).template get<frd::size_t{0}>();
+    };
+
+    template<typename T>
+    concept _adl_getable = adl_discoverable<T> && requires(T &&t) {
+        get<frd::size_t{0}>(frd::forward<T>(t));
+    };
+
+    template<typename T>
+    concept _nothrow_get = (
+        (_member_getable<T> && noexcept(frd::declval<T>().template get<frd::size_t{0}>())) ||
+        (_adl_getable<T>    && noexcept(get<frd::size_t{0}>(frd::declval<T>())))
+    );
+
+    template<frd::size_t I, typename Getable>
+    requires (_member_getable<Getable> || _adl_getable<Getable>)
+    constexpr decltype(auto) get(Getable &&getable) noexcept(_nothrow_get<Getable>) {
+        if constexpr (_member_getable<Getable>) {
+            return frd::forward<Getable>(getable).template get<I>();
+        } else {
+            return get<I>(frd::forward<Getable>(getable));
+        }
+    }
+
+    template<typename T>
+    concept getable = requires(T &&t) {
+        ::frd::get<frd::size_t{0}>(frd::forward<T>(t));
+    };
+
+    template<typename T>
+    concept nothrow_getable = getable<T> && noexcept(frd::get<frd::size_t{0}>(frd::declval<T>()));
 
     template<typename LHS, typename RHS>
     requires (std::three_way_comparable_with<const LHS &, const RHS &> || weakly_less_than_comparable_with<const LHS &, const RHS &>)

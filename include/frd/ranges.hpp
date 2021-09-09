@@ -54,10 +54,9 @@ namespace frd {
     };
 
     template<typename R>
-    concept _adl_begin = (class_type<remove_reference<R>> || enum_type<remove_reference<R>>) &&
-        requires(R &r) {
-            { frd::decay_copy(begin(r)) } -> iterator;
-        };
+    concept _adl_begin = adl_discoverable<R> && requires(R &r) {
+        { frd::decay_copy(begin(r)) } -> iterator;
+    };
 
     template<_maybe_borrowed_range R>
     requires (bound_array<remove_reference<R>> || _member_begin<R> || _adl_begin<R>)

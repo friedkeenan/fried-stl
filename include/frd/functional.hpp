@@ -1,5 +1,7 @@
 #pragma once
 
+#include <frd/arithmetic.hpp>
+#include <frd/tuple.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
@@ -24,7 +26,10 @@ namespace frd {
     template<typename Invocable, typename... Args>
     requires (_normal_callable<Invocable, Args...>)
     [[nodiscard]]
-    constexpr decltype(auto) invoke(Invocable &&inv, Args &&... args) noexcept(noexcept(frd::forward<Invocable>(inv)(frd::forward<Args>(args)...))) {
+    constexpr decltype(auto) invoke(Invocable &&inv, Args &&... args)
+    noexcept(
+        noexcept(frd::forward<Invocable>(inv)(frd::forward<Args>(args)...))
+    ) {
         return frd::forward<Invocable>(inv)(frd::forward<Args>(args)...);
     }
 
@@ -92,6 +97,9 @@ namespace frd {
     };
 
     template<typename Invocable, typename... Args>
+    concept nothrow_invocable = invocable<Invocable, Args...> && noexcept(invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
+
+    template<typename Invocable, typename... Args>
     requires (invocable<Invocable, Args...>)
     using invoke_result = decltype(invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
 
@@ -108,6 +116,131 @@ namespace frd {
         } else {
             return invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...);
         }
+    }
+
+    template<typename Child, move_constructible Fn, move_constructible... BoundArgs>
+    struct _bind_front_back_impl {
+        static constexpr frd::size_t NumBoundArgs = sizeof...(BoundArgs);
+
+        Fn _fn;
+        frd::tuple<BoundArgs...> _bound_args;
+
+        /* Add leading dummy 'int' argument to avoid ambiguity with copy/move constructors. */
+        template<typename FnOther, typename... BoundArgsOther>
+        requires (constructible_from<Fn, FnOther> && (constructible_from<BoundArgs, BoundArgsOther> && ...))
+        constexpr _bind_front_back_impl(int, FnOther &&fn, BoundArgsOther &&... bound_args)
+        noexcept(
+            nothrow_constructible_from<Fn, FnOther> && (nothrow_constructible_from<BoundArgs, BoundArgsOther> && ...)
+        )
+            : _fn(frd::forward<FnOther>(fn)), _bound_args(frd::forward<BoundArgsOther>(bound_args)...) { }
+
+        template<typename... CallArgs>
+        constexpr decltype(auto) operator ()(CallArgs &&... call_args) &
+        noexcept(
+            noexcept(Child::_call(*this, make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...))
+        ) {
+            return Child::_call(*this, make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...);
+        }
+
+        template<typename... CallArgs>
+        constexpr decltype(auto) operator ()(CallArgs &&... call_args) const &
+        noexcept(
+            noexcept(Child::_call(*this, make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...))
+        ) {
+            return Child::_call(*this, make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...);
+        }
+
+        template<typename... CallArgs>
+        constexpr decltype(auto) operator ()(CallArgs &&... call_args) &&
+        noexcept(
+            noexcept(Child::_call(frd::move(*this), make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...))
+        ) {
+            return Child::_call(frd::move(*this), make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...);
+        }
+
+        template<typename... CallArgs>
+        constexpr decltype(auto) operator ()(CallArgs &&... call_args) const &&
+        noexcept(
+            noexcept(Child::_call(frd::move(*this), make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...))
+        ) {
+            return Child::_call(frd::move(*this), make_index_sequence<NumBoundArgs>{}, frd::forward<CallArgs>(call_args)...);
+        }
+    };
+
+    template<typename Fn, typename... BoundArgs>
+    struct _bind_front_fn : _bind_front_back_impl<_bind_front_fn<Fn, BoundArgs...>, Fn, BoundArgs...> {
+        using Base = _bind_front_back_impl<_bind_front_fn<Fn, BoundArgs...>, Fn, BoundArgs...>;
+
+        template<typename Self, frd::size_t... I, typename... CallArgs>
+        static constexpr decltype(auto) _call(Self &&self, frd::index_sequence<I...>, CallArgs &&... call_args)
+        noexcept(
+            noexcept(
+                invoke(
+                    frd::forward<Self>(self)._fn,
+                    frd::get<I>(frd::forward<Self>(self)._bound_args)...,
+                    frd::forward<CallArgs>(call_args)...
+                )
+            )
+        ){
+            return invoke(
+                frd::forward<Self>(self)._fn,
+                frd::get<I>(frd::forward<Self>(self)._bound_args)...,
+                frd::forward<CallArgs>(call_args)...
+            );
+        }
+
+        /* Inherit constructor. */
+        using Base::Base;
+    };
+
+    template<typename Fn, typename... BoundArgs>
+    constexpr auto bind_front(Fn &&fn, BoundArgs &&... bound_args)
+    noexcept(
+        nothrow_constructible_from<_bind_front_fn<decay<Fn>, decay<BoundArgs>...>, int, Fn, BoundArgs...>
+    ) {
+        return _bind_front_fn<decay<Fn>, decay<BoundArgs>...>(
+            0,
+            frd::forward<Fn>(fn),
+            frd::forward<BoundArgs>(bound_args)...
+        );
+    }
+
+    template<typename Fn, typename... BoundArgs>
+    struct _bind_back_fn : _bind_front_back_impl<_bind_back_fn<Fn, BoundArgs...>, Fn, BoundArgs...> {
+        using Base = _bind_front_back_impl<_bind_back_fn<Fn, BoundArgs...>, Fn, BoundArgs...>;
+
+        template<typename Self, frd::size_t... I, typename... CallArgs>
+        static constexpr decltype(auto) _call(Self &&self, frd::index_sequence<I...>, CallArgs &&... call_args)
+        noexcept(
+            noexcept(
+                invoke(
+                    frd::forward<Self>(self)._fn,
+                    frd::forward<CallArgs>(call_args)...,
+                    frd::get<I>(frd::forward<Self>(self)._bound_args)...
+                )
+            )
+        ){
+            return invoke(
+                frd::forward<Self>(self)._fn,
+                frd::forward<CallArgs>(call_args)...,
+                frd::get<I>(frd::forward<Self>(self)._bound_args)...
+            );
+        }
+
+        /* Inherit constructor. */
+        using Base::Base;
+    };
+
+    template<typename Fn, typename... BoundArgs>
+    constexpr auto bind_back(Fn &&fn, BoundArgs &&... bound_args)
+    noexcept(
+        nothrow_constructible_from<_bind_back_fn<decay<Fn>, decay<BoundArgs>...>, int, Fn, BoundArgs...>
+    ) {
+        return _bind_back_fn<decay<Fn>, decay<BoundArgs>...>(
+            0,
+            frd::forward<Fn>(fn),
+            frd::forward<BoundArgs>(bound_args)...
+        );
     }
 
 }

@@ -138,6 +138,9 @@ namespace frd {
     };
 
     template<typename T>
+    concept adl_discoverable = class_type<remove_reference<T>> || enum_type<remove_reference<T>>;
+
+    template<typename T>
     concept incomplete = !requires {
         /* You cannot find the size of incomplete types. */
         sizeof(T);
@@ -193,6 +196,9 @@ namespace frd {
             T(frd::forward<Args>(args)...);
         }
     );
+
+    template<typename T, typename... Args>
+    concept nothrow_constructible_from = constructible_from<T, Args...> && noexcept(T(frd::declval<Args>()...));
 
     template<typename T>
     concept default_constructible = constructible_from<T> && requires {

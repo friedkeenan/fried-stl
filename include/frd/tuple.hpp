@@ -58,6 +58,7 @@ namespace frd {
             requires (sizeof...(TailFwd) == sizeof...(Tail))
             constexpr explicit tuple(HeadFwd &&head, TailFwd &&... tail) : _head(frd::forward<HeadFwd>(head)), _tail(frd::forward<TailFwd>(tail)...) { }
 
+            /* TODO: Make sure we don't need lvalue/rvalue overloads. */
             template<size_type I>
             constexpr decltype(auto) get() noexcept {
                 if constexpr (I == 0) {
@@ -163,7 +164,7 @@ namespace std {
         if constexpr (frd::same_as<T, Head>) {
             return t._head;
         } else {
-            return get<T>(t._tail);
+            return std::get<T>(t._tail);
         }
     }
 
@@ -172,7 +173,7 @@ namespace std {
         if constexpr (frd::same_as<T, Head>) {
             return t._head;
         } else {
-            return get<T>(t._tail);
+            return std::get<T>(t._tail);
         }
     }
 
@@ -181,7 +182,7 @@ namespace std {
         if constexpr (frd::same_as<T, Head>) {
             return frd::move(t._head);
         } else {
-            return get<T>(std::move(t._tail));
+            return std::get<T>(std::move(t._tail));
         }
     }
 
@@ -190,7 +191,7 @@ namespace std {
         if constexpr (frd::same_as<T, Head>) {
             return frd::move(t._head);
         } else {
-            return get<T>(std::move(t._tail));
+            return std::get<T>(std::move(t._tail));
         }
     }
 

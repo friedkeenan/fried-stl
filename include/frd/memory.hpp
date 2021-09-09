@@ -357,11 +357,12 @@ namespace frd {
             using pointer   = T *;
             using reference = T &;
 
-            constexpr unique_ptr(const pointer ptr) : _unique_ptr_impl<T>(ptr) { }
+            using Base = _unique_ptr_impl<T>;
+            using Base::Base;
 
             template<typename U>
             requires (implicitly_convertible_to<U *, pointer>)
-            constexpr unique_ptr(unique_ptr<U> &&other) : _unique_ptr_impl<T>(other.release()) { }
+            constexpr unique_ptr(unique_ptr<U> &&other) : Base(other.release()) { }
 
             template<typename U>
             requires (implicitly_convertible_to<U *, pointer>)
@@ -412,11 +413,12 @@ namespace frd {
             using pointer   = T *;
             using reference = T &;
 
-            constexpr unique_ptr(const pointer ptr) : _unique_ptr_impl<T>(ptr) { }
+            using Base = _unique_ptr_impl<T>;
+            using Base::Base;
 
             template<typename U>
             requires (implicitly_convertible_to<U (*)[], T(*)[]>)
-            constexpr unique_ptr(unique_ptr<U[]> &&other) : _unique_ptr_impl<T>(other.release()) { }
+            constexpr unique_ptr(unique_ptr<U[]> &&other) : Base(other.release()) { }
 
             template<typename U>
             requires (implicitly_convertible_to<U (*)[], T(*)[]>)
