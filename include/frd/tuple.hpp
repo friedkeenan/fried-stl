@@ -44,7 +44,7 @@ namespace frd {
                 to be mandated by the standard, but it makes more sense
                 to me to store the head element before the tail elements.
             */
-            Head _head;
+            [[no_unique_address]] Head _head;
             [[no_unique_address]] tuple<Tail...> _tail;
 
             constexpr tuple() = default;

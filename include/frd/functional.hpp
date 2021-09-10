@@ -122,8 +122,8 @@ namespace frd {
     struct _bind_front_back_impl {
         static constexpr frd::size_t NumBoundArgs = sizeof...(BoundArgs);
 
-        Fn _fn;
-        frd::tuple<BoundArgs...> _bound_args;
+        [[no_unique_address]] Fn _fn;
+        [[no_unique_address]] frd::tuple<BoundArgs...> _bound_args;
 
         /* Add leading dummy 'int' argument to avoid ambiguity with copy/move constructors. */
         template<typename FnOther, typename... BoundArgsOther>
@@ -199,11 +199,14 @@ namespace frd {
     };
 
     template<typename Fn, typename... BoundArgs>
-    constexpr auto bind_front(Fn &&fn, BoundArgs &&... bound_args)
+    using _bind_front_fn_with_decay = _bind_front_fn<decay<Fn>, decay<BoundArgs>...>;
+
+    template<typename Fn, typename... BoundArgs>
+    constexpr _bind_front_fn_with_decay<Fn, BoundArgs...> bind_front(Fn &&fn, BoundArgs &&... bound_args)
     noexcept(
-        nothrow_constructible_from<_bind_front_fn<decay<Fn>, decay<BoundArgs>...>, int, Fn, BoundArgs...>
+        nothrow_constructible_from<_bind_front_fn_with_decay<Fn, BoundArgs...>, int, Fn, BoundArgs...>
     ) {
-        return _bind_front_fn<decay<Fn>, decay<BoundArgs>...>(
+        return _bind_front_fn_with_decay<Fn, BoundArgs...>(
             0,
             frd::forward<Fn>(fn),
             frd::forward<BoundArgs>(bound_args)...
@@ -224,7 +227,7 @@ namespace frd {
                     frd::get<I>(frd::forward<Self>(self)._bound_args)...
                 )
             )
-        ){
+        ) {
             return invoke(
                 frd::forward<Self>(self)._fn,
                 frd::forward<CallArgs>(call_args)...,
@@ -237,11 +240,14 @@ namespace frd {
     };
 
     template<typename Fn, typename... BoundArgs>
-    constexpr auto bind_back(Fn &&fn, BoundArgs &&... bound_args)
+    using _bind_back_fn_with_decay = _bind_back_fn<decay<Fn>, decay<BoundArgs>...>;
+
+    template<typename Fn, typename... BoundArgs>
+    constexpr _bind_back_fn_with_decay<Fn, BoundArgs...> bind_back(Fn &&fn, BoundArgs &&... bound_args)
     noexcept(
-        nothrow_constructible_from<_bind_back_fn<decay<Fn>, decay<BoundArgs>...>, int, Fn, BoundArgs...>
+        nothrow_constructible_from<_bind_back_fn_with_decay<Fn, BoundArgs...>, int, Fn, BoundArgs...>
     ) {
-        return _bind_back_fn<decay<Fn>, decay<BoundArgs>...>(
+        return _bind_back_fn_with_decay<Fn, BoundArgs...>(
             0,
             frd::forward<Fn>(fn),
             frd::forward<BoundArgs>(bound_args)...
