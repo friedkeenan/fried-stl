@@ -79,10 +79,9 @@ namespace frd {
     };
 
     template<typename R>
-    concept _adl_end = (class_type<remove_reference<R>> || enum_type<remove_reference<R>>) &&
-        requires(R &r) {
-            { frd::decay_copy(end(r)) } -> sentinel_for<range_iterator<R>>;
-        };
+    concept _adl_end = adl_discoverable<R> && requires(R &r) {
+        { frd::decay_copy(end(r)) } -> sentinel_for<range_iterator<R>>;
+    };
 
     template<_maybe_borrowed_range R>
     requires (bound_array<remove_reference<R>> || _member_end<R> || _adl_end<R>)
@@ -123,7 +122,7 @@ namespace frd {
 
     template<typename R>
     concept viewable_range = range<R> && (
-        (view<remove_cvref<R>> && constructible_from<remove_cvref<R>, R>) ||
+        ( view<remove_cvref<R>> && constructible_from<remove_cvref<R>, R>) ||
         (!view<remove_cvref<R>> && borrowed_range<R>)
     );
 

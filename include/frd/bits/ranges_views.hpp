@@ -2,9 +2,10 @@
 
 #include <frd/bits/ranges_base.hpp>
 
-#include <frd/concepts.hpp>
 #include <frd/utility.hpp>
 #include <frd/functional.hpp>
+#include <frd/type_traits.hpp>
+#include <frd/concepts.hpp>
 
 namespace frd {
 
@@ -14,14 +15,45 @@ namespace frd {
         and its outline of GCC 10's implementation.
     */
 
+    /*
+        Forward declare 'range_adaptor_closure' so we can
+        have a deduction guide that 'range_adaptor' can use.
+    */
+    template<typename T>
+    class range_adaptor_closure;
+
+    template<typename T>
+    range_adaptor_closure(T &&) -> range_adaptor_closure<decay<T>>;
+
     template<typename Invocable>
     class range_adaptor {
         public:
             [[no_unique_address]] Invocable _invocable;
 
-            template<forwarder_for<Invocable> InvFwd>
-            constexpr range_adaptor(InvFwd &&inv) noexcept(nothrow_constructible_from<Invocable, InvFwd>) : _invocable(frd::forward<InvFwd>(inv)) { }
+            /* Don't make constructor explicit so range adaptors can be converted from lambdas implicitly. */
+            template<typename InvOther>
+            requires (constructible_from<Invocable, InvOther>)
+            constexpr range_adaptor(InvOther &&inv) noexcept(nothrow_constructible_from<Invocable, InvOther>) : _invocable(frd::forward<InvOther>(inv)) { }
 
+            /*
+                NOTE: We are not as strict about the argument count as we could be.
+
+                Currently a range adaptor can be called with the wrong
+                number of arguments, which will result in an error later,
+                but not necessarily an easy to track down error.
+
+                The issue is that range adaptors don't *have* to take a
+                fixed number of arguments, and even if they did the number
+                would have to be manually specified as there's not a way
+                to get the number of arguments from a templated function.
+
+                This could possibly be changed so the argument count is
+                specified in a template parameter, maybe could make the
+                invocable a template parameter too, but in general I lean
+                towards not requiring a certain number of arguments for
+                simplicity, correctness, and readability when constructing
+                range adaptors.
+            */
             template<typename... Args>
             requires (sizeof...(Args) > 0)
             constexpr auto operator ()(Args &&... args) const
@@ -41,7 +73,7 @@ namespace frd {
                     return frd::invoke(this->_invocable, frd::forward<Args>(args)...);
                 } else {
                     /*
-                        Else, return a range_adaptor_closure with the arguments bound to the back.
+                        Else, return a 'range_adaptor_closure' with the arguments bound to the back.
 
                         (A range adaptor 'A' can be called like 'A(...)', which will produce a range adaptor closure.)
                     */
@@ -50,11 +82,20 @@ namespace frd {
             }
     };
 
+    template<typename T>
+    range_adaptor(T &&) -> range_adaptor<decay<T>>;
+
+    /* TODO: Is it worth it to inherit 'range_adaptor' only for its constructor and member? */
     template<typename Invocable>
     class range_adaptor_closure : public range_adaptor<Invocable> {
         /* A range adaptor closure is a range adaptor that accepts only one argument, the range. */
 
         public:
+            using Base = range_adaptor<Invocable>;
+
+            /* Inherit constructor. */
+            using Base::Base;
+
             /*
                 By defining our own call operator, we remove the call operator
                 inherited from 'range_adaptor', stopping things like 'A(...)(...)'
@@ -83,7 +124,7 @@ namespace frd {
             friend constexpr auto operator |(const range_adaptor_closure<T> &lhs, const range_adaptor_closure &rhs)
             noexcept(
                 nothrow_constructible_from<range_adaptor_closure<T>, const range_adaptor_closure<T> &> &&
-                nothrow_constructible_from<range_adaptor_closure, const range_adaptor_closure &>
+                nothrow_constructible_from<range_adaptor_closure,    const range_adaptor_closure &>
             ) {
                 /*
                     For two range adaptor closures 'C' and 'D' and viewable range 'R',
