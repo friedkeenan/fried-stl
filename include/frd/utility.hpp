@@ -46,7 +46,6 @@ namespace frd {
         A utility function that will use ADL-discovered swap, std::swap,
         or swap them manually, using no copies.
 
-        TODO: 'noexcept' condition.
         TODO: Make implementation of 'std::ranges::swap'?
     */
     template<typename LHS, typename RHS>
