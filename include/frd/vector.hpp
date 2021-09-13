@@ -2,7 +2,6 @@
 
 #include <frd/limits.hpp>
 #include <frd/memory.hpp>
-#include <frd/interval.hpp>
 #include <frd/ranges.hpp>
 #include <frd/algorithm.hpp>
 #include <frd/concepts.hpp>

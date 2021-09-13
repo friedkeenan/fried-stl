@@ -138,7 +138,7 @@ namespace frd {
     };
 
     template<typename T>
-    concept adl_discoverable = class_type<remove_reference<T>> || enum_type<remove_reference<T>>;
+    concept adl_discoverable = class_type<remove_cvref<T>> || enum_type<remove_cvref<T>>;
 
     template<typename T>
     concept incomplete = !requires {
@@ -152,6 +152,7 @@ namespace frd {
     template<typename T>
     concept referenceable = !void_type<T>;
 
+    /* I do not implement 'std::common_reference_t' because it does not seem fun to do so. */
     template<typename T, typename U>
     concept common_reference_with = (
         same_as<std::common_reference_t<T, U>, std::common_reference_t<U, T>> &&
@@ -248,6 +249,47 @@ namespace frd {
 
     template<typename T>
     concept less_than_comparable = weakly_less_than_comparable_with<T, T>;
+
+    template<typename T, typename U>
+    concept weakly_less_than_or_equal_comparable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t <= u } -> boolean_testable;
+        { u <= t } -> boolean_testable;
+    };
+
+    template<typename T>
+    concept less_than_or_equal_comparable = weakly_less_than_or_equal_comparable_with<T, T>;
+
+    template<typename T, typename U>
+    concept weakly_greater_than_comparable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t > u } -> boolean_testable;
+        { u > t } -> boolean_testable;
+    };
+
+    template<typename T>
+    concept greater_than_comparable = weakly_greater_than_comparable_with<T, T>;
+
+    template<typename T, typename U>
+    concept weakly_greater_than_or_equal_comparable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {
+        { t >= u } -> boolean_testable;
+        { u >= t } -> boolean_testable;
+    };
+
+    template<typename T>
+    concept greater_than_or_equal_comparable = weakly_greater_than_or_equal_comparable_with<T, T>;
+
+    template<typename T, typename U>
+    concept partially_ordered_with = (
+        weakly_less_than_comparable_with<T, U>             &&
+        weakly_less_than_or_equal_comparable_with<T, U>    &&
+        weakly_greater_than_comparable_with<T, U>          &&
+        weakly_greater_than_or_equal_comparable_with<T, U>
+    );
+
+    template<typename T>
+    concept partially_ordered = partially_ordered_with<T, T>;
+
+    template<typename T>
+    concept totally_ordered = equality_comparable<T> && partially_ordered<T>;
 
     template<typename T, typename U, typename Result = remove_reference<T>>
     concept weakly_addable_with = requires(remove_reference<T> &t, remove_reference<U> &u) {

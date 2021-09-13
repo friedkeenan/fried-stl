@@ -236,6 +236,13 @@ namespace frd {
     template<typename T>
     using remove_extent = typename _remove_extent<T>::type;
 
+    template<typename T>                struct _remove_all_extents       : type_holder<T> { };
+    template<typename T>                struct _remove_all_extents<T[]>  : _remove_all_extents<T> { };
+    template<typename T, frd::size_t N> struct _remove_all_extents<T[N]> : _remove_all_extents<T> { };
+
+    template<typename T>
+    using remove_all_extents = typename _remove_all_extents<T>::type;
+
     template<typename T> struct _remove_signed   : type_holder<T> { };
     template<typename T> struct _remove_unsigned : type_holder<T> { };
 
@@ -338,6 +345,9 @@ namespace frd {
 
     template<typename T>
     using add_rvalue_reference = typename _add_lvalue_reference<T>::type;
+
+    template<typename T>
+    using add_pointer = remove_reference<T> *;
 
     template<template<typename...> typename Op, typename... Args>
     concept _op_works = requires {

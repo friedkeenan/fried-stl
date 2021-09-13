@@ -26,4 +26,7 @@ namespace frd {
     template<typename T>
     concept semiregular = copyable<T> && default_constructible<T>;
 
+    template<typename T>
+    concept regular = semiregular<T> && equality_comparable<T>;
+
 }

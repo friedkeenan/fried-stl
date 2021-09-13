@@ -112,6 +112,16 @@ namespace frd {
     template<typename T>
     concept nothrow_getable = getable<T> && noexcept(frd::get<frd::size_t{0}>(frd::declval<T>()));
 
+    template<integral T>
+    constexpr make_signed<T> to_signed(const T value) noexcept {
+        return static_cast<make_signed<T>>(value);
+    }
+
+    template<integral T>
+    constexpr make_unsigned<T> to_unsigned(const T value) noexcept {
+        return static_cast<make_unsigned<T>>(value);
+    }
+
     template<typename LHS, typename RHS>
     requires (std::three_way_comparable_with<const LHS &, const RHS &> || weakly_less_than_comparable_with<const LHS &, const RHS &>)
     constexpr auto synthetic_three_way_compare(const LHS &lhs, const RHS &rhs) noexcept {

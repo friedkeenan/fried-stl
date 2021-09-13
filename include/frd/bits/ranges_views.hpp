@@ -33,7 +33,8 @@ namespace frd {
             /* Don't make constructor explicit so range adaptors can be converted from lambdas implicitly. */
             template<typename InvOther>
             requires (constructible_from<Invocable, InvOther>)
-            constexpr range_adaptor(InvOther &&inv) noexcept(nothrow_constructible_from<Invocable, InvOther>) : _invocable(frd::forward<InvOther>(inv)) { }
+            constexpr range_adaptor(InvOther &&inv) noexcept(nothrow_constructible_from<Invocable, InvOther>)
+                : _invocable(frd::forward<InvOther>(inv)) { }
 
             /*
                 NOTE: We are not as strict about the argument count as we could be.
@@ -85,10 +86,17 @@ namespace frd {
     template<typename T>
     range_adaptor(T &&) -> range_adaptor<decay<T>>;
 
-    /* TODO: Is it worth it to inherit 'range_adaptor' only for its constructor and member? */
+    /*
+        We inherit from 'range_adaptor' for its constructor and member attribute,
+        and for semantics, as all range adaptor closures are range adaptors.
+    */
     template<typename Invocable>
     class range_adaptor_closure : public range_adaptor<Invocable> {
-        /* A range adaptor closure is a range adaptor that accepts only one argument, the range. */
+        /*
+            A range adaptor closure is a range adaptor that accepts only
+            one argument, the range, and is the final stage of the range
+            adaptor design that ranges interact with when piping.
+        */
 
         public:
             using Base = range_adaptor<Invocable>;
@@ -133,11 +141,207 @@ namespace frd {
                 */
 
                 return range_adaptor_closure(
-                    [lhs, rhs]<typename R>(R &&r) {
+                    [lhs, rhs]<viewable_range R>(R &&r) {
                         return (frd::forward<R>(r) | lhs) | rhs;
                     }
                 );
             }
     };
+
+    template<class_type Child>
+    requires (same_as<Child, remove_cvref<Child>>)
+    class view_interface : public view_tag {
+        constexpr Child &_child() noexcept {
+            return static_cast<Child &>(*this);
+        }
+
+        constexpr const Child &_child() const noexcept {
+            return static_cast<const Child &>(*this);
+        }
+    };
+
+    namespace views {
+
+        constexpr inline range_adaptor_closure all = []<viewable_range R>(R &&r)
+        requires (
+            view<R> /* || ... */
+        ) {
+            if constexpr (view<R>) {
+                return frd::decay_copy(frd::forward<R>(r));
+            } /* else ... */
+        };
+
+        template<viewable_range R>
+        using all_t = decltype(views::all(frd::declval<R>()));
+
+    }
+
+    #define VIEW_DEDUCTION_GUIDE(cls)      \
+        template<typename R>               \
+        cls(R &&) -> cls<views::all_t<R>>;
+
+    #undef VIEW_DEDUCTION_GUIDE
+
+    /* A view over an interval [start, end), similar to Python's 'range'. */
+    template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
+    class interval : public view_interface<interval<Start, End>> {
+        public:
+            /* Forward declare. */
+            class _sentinel;
+
+            class iterator {
+                public:
+                    using value_type      = Start;
+                    using difference_type = iter_difference<Start>;
+
+                    Start _value;
+
+                    constexpr iterator() = default;
+                    constexpr explicit iterator(const Start &value) noexcept : _value(value) { }
+
+                    constexpr iterator &operator ++() noexcept {
+                        this->_value++;
+
+                        return *this;
+                    }
+
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++, noexcept)
+
+                    constexpr iterator &operator --() noexcept requires (weakly_decrementable<Start>) {
+                        this->_value--;
+
+                        return *this;
+                    }
+
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, noexcept requires (weakly_decrementable<Start>))
+
+                    constexpr iterator operator +(const difference_type delta) const noexcept
+                    requires (
+                        weakly_addable_with<Start, difference_type>
+                    ) {
+                        return iterator(this->_value + delta);
+                    }
+
+                    constexpr iterator &operator +=(const difference_type delta) noexcept
+                    requires (
+                        in_place_addable_with<Start, difference_type>                           ||
+                        (weakly_addable_with<Start, difference_type> && copy_assignable<Start>)
+                    ) {
+                        if constexpr (in_place_addable_with<Start, difference_type>) {
+                            this->_value += delta;
+                        } else {
+                            this->_value = (this->_value + delta);
+                        }
+
+                        return *this;
+                    }
+
+                    template<typename Delta>
+                    constexpr iterator operator -(const difference_type delta) const noexcept
+                    requires (
+                        weakly_subtractable_with<Start, difference_type>
+                    ) {
+                        return iterator(this->_value - delta);
+                    }
+
+                    constexpr iterator &operator -=(const difference_type &delta) noexcept
+                    requires (
+                        in_place_subtractable_with<Start, difference_type>                           ||
+                        (weakly_subtractable_with<Start, difference_type> && copy_assignable<Start>)
+                    ) {
+                        if constexpr (in_place_subtractable_with<Start, difference_type>) {
+                            this->_value -= delta;
+                        } else {
+                            this->_value = (this->_value - delta);
+                        }
+
+                        return *this;
+                    }
+
+                    constexpr Start operator *() const noexcept {
+                        return this->_value;
+                    }
+
+                    constexpr Start operator [](const difference_type delta) const noexcept
+                    requires (
+                        weakly_addable_with<Start, difference_type>
+                    ) {
+                        return this->_value + delta;
+                    }
+
+                    constexpr auto operator <=>(const iterator &rhs) const noexcept = default;
+
+                    /* Needed because of the '_sentinel' overload. */
+                    constexpr bool operator ==(const iterator &rhs) const noexcept
+                    requires (
+                        equality_comparable<Start>
+                    ) {
+                        return this->_value == rhs._value;
+                    }
+
+                    constexpr bool operator ==(const _sentinel &rhs) const noexcept {
+                        return this->_value == rhs._value;
+                    }
+            };
+
+            using const_iterator = iterator;
+
+            class _sentinel {
+                public:
+                    End _value;
+
+                constexpr _sentinel() = default;
+                constexpr explicit _sentinel(const End &value) noexcept : _value(value) { }
+
+                constexpr bool operator ==(const iterator &rhs) const noexcept {
+                    return this->_value == rhs._value;
+                }
+            };
+
+            /*
+                If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel.
+                This allows certain optimizations with regards to iterator operations.
+            */
+            using sentinel = conditional<same_as<Start, End>, iterator, _sentinel>;
+
+            Start _start;
+            End   _end;
+
+            constexpr explicit interval(const End &end) noexcept requires(integral<Start>) : _start(), _end(end) { }
+
+            constexpr interval(const Start &start, const End &end) : _start(start), _end(end) { }
+
+            constexpr iterator begin() const noexcept {
+                return iterator(this->_start);
+            }
+
+            constexpr sentinel end() const noexcept {
+                return sentinel(this->_end);
+            }
+    };
+
+    template<integral T>
+    interval(T) -> interval<T, T>;
+
+    template<typename Start, typename End>
+    constexpr inline bool enable_borrowed_range<interval<Start, End>> = true;
+
+    namespace views {
+
+        /*
+            A range adaptor closure that gets the iterators from a range.
+
+            'R' must be a borrowed range because 'interval' doesn't store a range.
+        */
+        constexpr inline range_adaptor_closure iterators = []<viewable_range R>(R &&r)
+        requires (
+            borrowed_range<R>
+        ) {
+            auto all_rng = views::all(frd::forward<R>(r));
+
+            return interval(frd::begin(all_rng), frd::end(all_rng));
+        };
+
+    }
 
 }

@@ -294,11 +294,20 @@ namespace frd {
     }
 
     template<typename Ptr>
+    concept _pointer_traits_to_address = requires(const Ptr &ptr) {
+        std::pointer_traits<Ptr>::to_address(ptr);
+    };
+
+    template<typename Ptr>
+    concept _arrow_dereferenceable_to_address = requires(const Ptr &ptr) {
+        ptr.operator ->();
+    };
+
+    template<typename Ptr>
+    requires (_pointer_traits_to_address<Ptr> || _arrow_dereferenceable_to_address<Ptr>)
     [[nodiscard]]
     constexpr auto to_address(const Ptr &ptr) noexcept {
-        if constexpr (requires {
-            std::pointer_traits<Ptr>::to_address(ptr);
-        }) {
+        if constexpr (_pointer_traits_to_address<Ptr>) {
             return std::pointer_traits<Ptr>::to_address(ptr);
         } else {
             return to_address(ptr.operator ->());

@@ -2,7 +2,7 @@
 
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
-#include <frd/interval.hpp>
+#include <frd/ranges.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 

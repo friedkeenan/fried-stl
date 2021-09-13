@@ -6,7 +6,6 @@
 #include <frd/tuple.hpp>
 #include <frd/memory.hpp>
 #include <frd/algorithm.hpp>
-#include <frd/interval.hpp>
 #include <frd/array.hpp>
 #include <frd/vector.hpp>
 
@@ -47,6 +46,8 @@ static_assert(frd::range<frd::array<int, 2>>);
 static_assert(frd::array{1, 2} == frd::array{1, 2});
 static_assert(frd::nothrow_swappable<frd::array<int, 2>>);
 static_assert(frd::to_array<char>({1, 2, 3}) == frd::array<char, 3>{1, 2, 3});
+
+static_assert(frd::sized_range<frd::vector<int>>);
 
 constexpr inline frd::range_adaptor shit = []<frd::viewable_range R>(R &&r, int x) {
     FRD_UNUSED(r);
@@ -91,8 +92,8 @@ int main(int argc, char **argv) {
     const auto &[x, y] = fuck;
     std::printf("%d %d\n", x, y);
 
-    for (const auto i : fuck) {
-        std::printf("%d\n", i);
+    for (const auto i : frd::interval(5) | frd::views::iterators) {
+        std::printf("%d\n", *i);
     }
 
     return 0;
