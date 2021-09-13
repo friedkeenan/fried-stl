@@ -298,8 +298,6 @@ namespace frd {
     template<range R>
     using range_sentinel = decltype(frd::end(frd::declval<R &>()));
 
-    /* TODO: 'range_size'. */
-
     template<range R>
     using range_value = iter_value<range_iterator<R>>;
 
