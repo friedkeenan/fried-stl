@@ -71,7 +71,7 @@ consteval bool fuck() {
 
     v.emplace(v.begin(), true);
 
-    return v[0].value && v.capacity() == 5;
+    return noexcept(frd::begin(v)) && v[0].value && v.capacity() == 5;
 }
 
 static_assert(fuck());

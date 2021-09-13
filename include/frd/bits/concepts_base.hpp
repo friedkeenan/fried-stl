@@ -21,8 +21,8 @@ namespace frd {
 
     template<typename From, typename To>
     concept nothrow_implicitly_convertible_to = implicitly_convertible_to<From, To> &&
-        requires(void (&func)(To), From from) {
-            requires noexcept(func(from));
+        requires(void (&func)(To) noexcept, From &&from) {
+            requires noexcept(func(frd::forward<From>(from)));
         };
 
     template<typename From, typename To>

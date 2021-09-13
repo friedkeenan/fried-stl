@@ -23,24 +23,21 @@ namespace frd {
         std::swap(frd::forward<T>(t), frd::forward<U>(u));
     };
 
-    template<typename T, typename U>
-    concept _adl_swappable = adl_discoverable<T> && requires(T &&t, U &&u) {
-        swap(frd::forward<T>, frd::forward<U>);
-    };
+    namespace _adl {
+
+        /* Lookup for '_adl_swap'. */
+        template<typename T>
+        void swap(T &, T &) = delete;
+
+        template<typename T, typename U>
+        concept _adl_swap = adl_discoverable<T> && requires(T &&t, U &&u) {
+            swap(frd::forward<T>, frd::forward<U>);
+        };
+
+    }
 
     template<typename T, typename U>
     concept _normal_swappable = move_constructible<T> && assignable_from<T &, U &&> && assignable_from<U &, T &&>;
-
-    template<typename T, typename U>
-    concept _nothrow_swap = (
-        (_std_swappable<T, U> && noexcept(std::swap(frd::declval<T>(), frd::declval<U>()))) ||
-        (_adl_swappable<T, U> && noexcept(     swap(frd::declval<T>(), frd::declval<U>()))) ||
-        (_normal_swappable<T, U> && (
-            noexcept(T(frd::move(frd::declval<T>())))                                  &&
-            noexcept(frd::declval<T &>() = frd::move(frd::declval<U>()))               &&
-            noexcept(frd::declval<U &>() = frd::move(frd::declval<remove_cvref<T>>()))
-        ))
-    );
 
     /*
         A utility function that will use ADL-discovered swap, std::swap,
@@ -48,18 +45,44 @@ namespace frd {
 
         TODO: Make implementation of 'std::ranges::swap'?
     */
-    template<typename LHS, typename RHS>
-    requires (_std_swappable<LHS, RHS> || _adl_swappable<LHS, RHS> || _normal_swappable<LHS, RHS>)
-    constexpr void swap(LHS &&lhs, RHS &&rhs) noexcept(_nothrow_swap<LHS, RHS>) {
-        if constexpr (_std_swappable<LHS, RHS>) {
-            std::swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
-        } else if constexpr (_adl_swappable<LHS, RHS>) {
-            swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
-        } else {
-            remove_cvref<LHS> tmp_lhs = frd::move(lhs);
-            lhs                       = frd::move(rhs);
-            rhs                       = frd::move(tmp_lhs);
+
+    /* Needs to be a callable object for ADL lookup to be checked. */
+    struct _swap_fn {
+        template<typename LHS, typename RHS>
+        requires (_std_swappable<LHS, RHS> || _adl::_adl_swap<LHS, RHS> || _normal_swappable<LHS, RHS>)
+        constexpr void operator ()(LHS &&lhs, RHS &&rhs) const
+        noexcept(
+            []() {
+                if constexpr (_std_swappable<LHS, RHS>) {
+                    return noexcept(std::swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs)));
+                } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
+                    return noexcept(swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs)));
+                } else {
+                    return (
+                        noexcept(remove_cvref<LHS>(frd::move(lhs)))                    &&
+                        noexcept(lhs = frd::move(rhs))                                 &&
+                        noexcept(rhs = frd::move(frd::declval<remove_cvref<LHS> &>()))
+                    );
+                }
+            }()
+        ) {
+            if constexpr (_std_swappable<LHS, RHS>) {
+                std::swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
+            } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
+                swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
+            } else {
+                remove_cvref<LHS> tmp_lhs = frd::move(lhs);
+                lhs                       = frd::move(rhs);
+                rhs                       = frd::move(tmp_lhs);
+            }
         }
+    };
+
+    /* Needs to be in own namespace to avoid ADL conflicts. */
+    namespace {
+
+        constexpr inline _swap_fn swap;
+
     }
 
     template<typename T, typename U>
@@ -79,29 +102,52 @@ namespace frd {
     concept nothrow_swappable = nothrow_swappable_with<T, T>;
 
     template<typename T>
-    concept _member_getable = requires(T &&t) {
+    concept _member_get = requires(T &&t) {
         frd::forward<T>(t).template get<frd::size_t{0}>();
     };
 
-    template<typename T>
-    concept _adl_getable = adl_discoverable<T> && requires(T &&t) {
-        get<frd::size_t{0}>(frd::forward<T>(t));
+    namespace _adl {
+
+        /* Lookup for '_adl_get'. */
+        template<frd::size_t>
+        void get() = delete;
+
+        template<typename T>
+        concept _adl_get = adl_discoverable<T> && requires(T &&t) {
+            get<frd::size_t{0}>(frd::forward<T>(t));
+        };
+
+    }
+
+    /* Needs to be a callable object for ADL lookup to be checked. */
+    template<frd::size_t I>
+    struct _get_fn {
+        template<typename Getable>
+        requires (_member_get<Getable> || _adl::_adl_get<Getable>)
+        constexpr decltype(auto) get(Getable &&getable) const
+        noexcept(
+            []() {
+                if constexpr (_member_get<Getable>) {
+                    return noexcept(frd::forward<Getable>(getable).template get<I>());
+                } else {
+                    return noexcept(get<I>(frd::forward<Getable>(getable)));
+                }
+            }()
+        ) {
+            if constexpr (_member_get<Getable>) {
+                return frd::forward<Getable>(getable).template get<I>();
+            } else {
+                return get<I>(frd::forward<Getable>(getable));
+            }
+        }
     };
 
-    template<typename T>
-    concept _nothrow_get = (
-        (_member_getable<T> && noexcept(frd::declval<T>().template get<frd::size_t{0}>())) ||
-        (_adl_getable<T>    && noexcept(get<frd::size_t{0}>(frd::declval<T>())))
-    );
+    /* Needs to be in own namespace to avoid ADL conflicts. */
+    namespace {
 
-    template<frd::size_t I, typename Getable>
-    requires (_member_getable<Getable> || _adl_getable<Getable>)
-    constexpr decltype(auto) get(Getable &&getable) noexcept(_nothrow_get<Getable>) {
-        if constexpr (_member_getable<Getable>) {
-            return frd::forward<Getable>(getable).template get<I>();
-        } else {
-            return get<I>(frd::forward<Getable>(getable));
-        }
+        template<frd::size_t I>
+        constexpr inline _get_fn<I> get;
+
     }
 
     template<typename T>
