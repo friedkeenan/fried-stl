@@ -15,8 +15,8 @@ namespace frd {
     concept same_as_without_cv = same_as<remove_cv<T>, remove_cv<U>>;
 
     template<typename From, typename To>
-    concept implicitly_convertible_to = requires(void (&func)(To), From from) {
-        func(from);
+    concept implicitly_convertible_to = requires(void (&func)(To), From &&from) {
+        func(frd::forward<From>(from));
     };
 
     template<typename From, typename To>

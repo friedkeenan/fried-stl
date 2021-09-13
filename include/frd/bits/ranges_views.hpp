@@ -176,11 +176,9 @@ namespace frd {
 
     }
 
-    #define VIEW_DEDUCTION_GUIDE(cls)      \
-        template<typename R>               \
-        cls(R &&) -> cls<views::all_t<R>>;
-
-    #undef VIEW_DEDUCTION_GUIDE
+    #define VIEW_DEDUCTION_GUIDE(cls)     \
+        template<typename R>              \
+        cls(R &&) -> cls<views::all_t<R>>
 
     /* A view over an interval [start, end), similar to Python's 'range'. */
     template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
@@ -236,7 +234,13 @@ namespace frd {
                         return *this;
                     }
 
-                    template<typename Delta>
+                    constexpr difference_type operator -(const iterator &rhs) const noexcept
+                    requires (
+                        subtractable<Start>
+                    ) {
+                        return this->_value - rhs._value;
+                    }
+
                     constexpr iterator operator -(const difference_type delta) const noexcept
                     requires (
                         weakly_subtractable_with<Start, difference_type>
@@ -343,5 +347,7 @@ namespace frd {
         };
 
     }
+
+    #undef VIEW_DEDUCTION_GUIDE
 
 }

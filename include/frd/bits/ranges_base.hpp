@@ -14,10 +14,17 @@ namespace frd {
         { *it } -> referenceable;
     };
 
-    template<typename It>
-    concept _adl_iter_move = adl_discoverable<It> && requires(It &&it) {
-        iter_move(frd::forward<It>(it));
-    };
+    namespace _adl {
+
+        /* Lookups for '_adl_iter_move'. */
+        void iter_move() = delete;
+
+        template<typename It>
+        concept _adl_iter_move = adl_discoverable<It> && requires(It &&it) {
+            iter_move(frd::forward<It>(it));
+        };
+
+    }
 
     template<typename It>
     concept _move_dereferenceable = requires(It &&it) {
@@ -27,27 +34,33 @@ namespace frd {
 
     template<typename It>
     concept _rvalue_dereferenceable = requires(It &&it) {
-        { *frd::forward<It>(it) } -> rvalue_reference;
+        *frd::forward<It>(it);
+        requires !reference<decltype(*frd::forward<It>(it))>;
     };
 
     template<typename It>
     concept _nothrow_iter_move = (
-        (_adl_iter_move<It>          && noexcept(iter_move(frd::declval<It>())))  ||
+        (_adl::_adl_iter_move<It>    && noexcept(iter_move(frd::declval<It>())))  ||
         (_move_dereferenceable<It>   && noexcept(frd::move(*frd::declval<It>()))) ||
         (_rvalue_dereferenceable<It> && noexcept(*frd::declval<It>()))
     );
 
-    template<class It>
-    requires (_adl_iter_move<It> || _move_dereferenceable<It> || _rvalue_dereferenceable<It>)
-    constexpr decltype(auto) iter_move(It &&it) noexcept(_nothrow_iter_move<It>) {
-        if constexpr (_adl_iter_move<It>) {
-            return iter_move(frd::forward<It>(it));
-        } else if constexpr (_move_dereferenceable<It>) {
-            return frd::move(*frd::forward<It>(it));
-        } else {
-            return *frd::forward<It>(it);
+    /* Needs to be a callable object for ADL lookup to be checked. */
+    struct _iter_move_fn {
+        template<class It>
+        requires (_adl::_adl_iter_move<It> || _move_dereferenceable<It> || _rvalue_dereferenceable<It>)
+        constexpr decltype(auto) operator ()(It &&it) const noexcept(_nothrow_iter_move<It>) {
+            if constexpr (_adl::_adl_iter_move<It>) {
+                return iter_move(frd::forward<It>(it));
+            } else if constexpr (_move_dereferenceable<It>) {
+                return frd::move(*frd::forward<It>(it));
+            } else {
+                return *frd::forward<It>(it);
+            }
         }
-    }
+    };
+
+    constexpr inline _iter_move_fn iter_move;
 
     /*
         NOTE: for 'iter_value' and 'iter_difference', the standard gets
@@ -233,6 +246,8 @@ namespace frd {
         frd::forward<R>(r).begin();
     };
 
+    /* TODO: Fix ADL detection for begin/end and other functions too I guess. */
+
     template<typename R>
     concept _adl_begin = adl_discoverable<R> && requires(R &r) {
         { frd::decay_copy(begin(r)) } -> iterator;
@@ -384,41 +399,54 @@ namespace frd {
         frd::forward<R>(r).size();
     };
 
-    template<typename R>
-    concept _adl_size = !std::ranges::disable_sized_range<remove_cv<R>> && adl_discoverable<R> &&
-        requires(R &&r) {
-            size(frd::forward<R>(r));
-        };
+    namespace _adl {
+
+        /* Lookups for '_adl_size'. */
+        void size(auto &) = delete;
+        void size(const auto &) = delete;
+
+        template<typename R>
+        concept _adl_size = !std::ranges::disable_sized_range<remove_cv<R>> && adl_discoverable<R> &&
+            requires(R &&r) {
+                { frd::decay_copy(size(frd::forward<R>(r))) } -> integral;
+            };
+
+    }
 
     template<typename R>
     concept _iterator_size = forward_range<R> && sized_sentinel_for<range_sentinel<R>, range_iterator<R>>;
 
     template<typename R>
     concept _nothrow_size = (
-        _range_array<R>                                                                                                ||
-        (_member_size<R>   && noexcept(frd::declval<R>().size()))                                                      ||
-        (_adl_size<R>      && noexcept(size(frd::declval<R>())))                                                       ||
-        (_iterator_size<R> && noexcept(frd::to_unsigned(frd::end(frd::declval<R>()) - frd::begin(frd::declval<R>()))))
+        _range_array<R>                                                                                                 ||
+        (_member_size<R>    && noexcept(frd::declval<R>().size()))                                                      ||
+        (_adl::_adl_size<R> && noexcept(size(frd::declval<R>())))                                                       ||
+        (_iterator_size<R>  && noexcept(frd::to_unsigned(frd::end(frd::declval<R>()) - frd::begin(frd::declval<R>()))))
     );
 
-    template<range R>
-    requires (
-        _range_array<R>   ||
-        _member_size<R>   ||
-        _adl_size<R>      ||
-        _iterator_size<R>
-    )
-    constexpr auto size(R &&r) noexcept(_nothrow_size<R>) {
-        if constexpr (_range_array<R>) {
-            return extent<remove_reference<R>>;
-        } else if constexpr (_member_size<R>) {
-            return frd::forward<R>(r).size();
-        } else if constexpr (_adl_size<R>) {
-            return size(frd::forward<R>(r));
-        } else {
-            return frd::to_unsigned(frd::end(r) - frd::begin(r));
+    /* Needs to be a callable object for ADL lookup to be checked. */
+    struct _size_fn {
+        template<range R>
+        requires (
+            _range_array<R>    ||
+            _member_size<R>    ||
+            _adl::_adl_size<R> ||
+            _iterator_size<R>
+        )
+        constexpr auto operator ()(R &&r) const noexcept(_nothrow_size<R>) {
+            if constexpr (_range_array<R>) {
+                return extent<remove_reference<R>>;
+            } else if constexpr (_member_size<R>) {
+                return frd::forward<R>(r).size();
+            } else if constexpr (_adl::_adl_size<R>) {
+                return size(frd::forward<R>(r));
+            } else {
+                return frd::to_unsigned(frd::end(r) - frd::begin(r));
+            }
         }
-    }
+    };
+
+    constexpr inline _size_fn size;
 
     template<typename R>
     concept sized_range = range<R> && requires(R &r) {

@@ -47,13 +47,7 @@ static_assert(frd::array{1, 2} == frd::array{1, 2});
 static_assert(frd::nothrow_swappable<frd::array<int, 2>>);
 static_assert(frd::to_array<char>({1, 2, 3}) == frd::array<char, 3>{1, 2, 3});
 
-static_assert(frd::sized_range<frd::vector<int>>);
-
-constexpr inline frd::range_adaptor shit = []<frd::viewable_range R>(R &&r, int x) {
-    FRD_UNUSED(r);
-
-    return x;
-};
+static_assert(frd::size(frd::interval(5)) == 5);
 
 consteval bool fuck() {
     struct S {
@@ -77,7 +71,7 @@ consteval bool fuck() {
 
     v.emplace(v.begin(), true);
 
-    return ((v | shit(1)) == 1) && v[0].value && v.capacity() == 5;
+    return v[0].value && v.capacity() == 5;
 }
 
 static_assert(fuck());
