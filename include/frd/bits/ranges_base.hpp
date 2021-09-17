@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iterator>
+#include <ranges>
 
 #include <frd/memory.hpp>
 #include <frd/utility.hpp>
@@ -160,7 +161,7 @@ namespace frd {
                                                  *out  = frd::forward<Value>(value);
         const_cast<const iter_reference<Out> &&>(*out) = frd::forward<Value>(value);
 
-                                                 *frd::forward<Out>(out)    = frd::forward<Value>(value);
+                                                 *frd::forward<Out>(out)  = frd::forward<Value>(value);
         const_cast<const iter_reference<Out> &&>(*frd::forward<Out>(out)) = frd::forward<Value>(value);
     };
 
@@ -240,12 +241,8 @@ namespace frd {
         }
     );
 
-    /* Remove this in favor of STL when Clang can compile libstdc++ ranges header. */
-    template<typename T>
-    constexpr inline bool enable_borrowed_range = false;
-
     template<typename R>
-    concept _maybe_borrowed_range = lvalue_reference<R> || enable_borrowed_range<remove_cvref<R>>;
+    concept _maybe_borrowed_range = lvalue_reference<R> || std::ranges::enable_borrowed_range<remove_cvref<R>>;
 
     template<typename R>
     concept _range_array = bound_array<remove_reference<R>>;
@@ -254,8 +251,6 @@ namespace frd {
     concept _member_begin = requires(R &&r) {
         frd::forward<R>(r).begin();
     };
-
-    /* TODO: Fix ADL detection for begin/end and other functions too I guess. */
 
     namespace _adl {
 
@@ -379,14 +374,17 @@ namespace frd {
     using range_difference = iter_difference<range_iterator<R>>;
 
     template<typename R>
+    concept common_range = range<R> && same_as<range_iterator<R>, range_sentinel<R>>;
+
+    template<typename R>
     concept borrowed_range = range<R> && (
-        lvalue_reference<R>                    ||
-        enable_borrowed_range<remove_cvref<R>>
+        lvalue_reference<R>                                 ||
+        std::ranges::enable_borrowed_range<remove_cvref<R>>
     );
 
     template<typename R>
     concept _member_data = requires(R &&r) {
-        frd::forward<R>(r).data();
+        { frd::forward<R>(r).data() } -> same_as<add_pointer<range_value<R>>>;
     };
 
     template<typename R>
@@ -417,15 +415,16 @@ namespace frd {
         }
     }
 
-    /* Equivalent to 'std::view_base'. */
+    /*
+        Equivalent to 'std::view_base'.
+
+        'std::ranges::enable_view' is specialized further down to be true
+        for types that derive from `view_tag`.
+    */
     struct view_tag { };
 
-    /* Remove 'enable_view' in favor of specializing STL when clang can compile libstdc++ ranges header. */
     template<typename R>
-    constexpr inline bool enable_view = derived_from<R, view_tag>;
-
-    template<typename R>
-    concept view = range<R> && movable<R> && enable_view<R>;
+    concept view = range<R> && movable<R> && std::ranges::enable_view<R>;
 
     template<typename R>
     concept input_range = range<R> && input_iterator<range_iterator<R>>;
@@ -453,7 +452,7 @@ namespace frd {
 
     template<typename R>
     concept _member_size = !std::ranges::disable_sized_range<remove_cv<R>> && requires(R &&r) {
-        frd::forward<R>(r).size();
+        { frd::forward<R>(r).size() } -> integral;
     };
 
     namespace _adl {
@@ -492,7 +491,7 @@ namespace frd {
                 } else if constexpr (_adl::_adl_size<R>) {
                     return noexcept(frd::decay_copy(size(frd::forward<R>(r))));
                 } else {
-                    return noexcept(frd::end(r) - frd::begin(r));
+                    return noexcept(frd::decay_copy(frd::end(r) - frd::begin(r)));
                 }
             }()
         ) {
@@ -536,5 +535,12 @@ namespace frd {
     */
     struct default_sentinel_t { };
     constexpr inline default_sentinel_t default_sentinel;
+
+}
+
+namespace std::ranges {
+
+    template<frd::derived_from<frd::view_tag> R>
+    constexpr inline bool enable_view<R> = true;
 
 }

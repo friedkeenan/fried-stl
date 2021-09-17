@@ -1,6 +1,7 @@
 #pragma once
 
 #include <frd/bits/ranges_base.hpp>
+#include <frd/bits/ranges_operations.hpp>
 
 #include <frd/utility.hpp>
 #include <frd/functional.hpp>
@@ -151,13 +152,157 @@ namespace frd {
     template<class_type Child>
     requires (same_as<Child, remove_cvref<Child>>)
     class view_interface : public view_tag {
-        constexpr Child &_child() noexcept {
-            return static_cast<Child &>(*this);
-        }
+        public:
+            constexpr Child &_child() noexcept {
+                static_assert(derived_from<Child, view_interface>, "Invalid use of CRTP with 'view_interface'!");
 
-        constexpr const Child &_child() const noexcept {
-            return static_cast<const Child &>(*this);
-        }
+                return static_cast<Child &>(*this);
+            }
+
+            constexpr const Child &_child() const noexcept {
+                static_assert(derived_from<Child, view_interface>, "Invalid use of CRTP with 'view_interface'!");
+
+                return static_cast<const Child &>(*this);
+            }
+
+            [[nodiscard]]
+            constexpr bool empty()
+            noexcept(
+                noexcept(static_cast<bool>(frd::begin(frd::declval<Child &>()) == frd::end(frd::declval<Child &>())))
+            )
+            requires (
+                forward_range<Child>
+            ) {
+                return static_cast<bool>(frd::begin(this->_child()) == frd::end(this->_child()));
+            }
+
+            [[nodiscard]]
+            constexpr bool empty() const
+            noexcept(
+                noexcept(static_cast<bool>(frd::begin(frd::declval<const Child &>()) == frd::end(frd::declval<const Child &>())))
+            )
+            requires (
+                forward_range<const Child>
+            ) {
+                return static_cast<bool>(frd::begin(this->_child()) == frd::end(this->_child()));
+            }
+
+            [[nodiscard]]
+            constexpr auto data()
+            noexcept(
+                noexcept(frd::begin(frd::declval<Child &>()))
+            )
+            requires (
+                contiguous_iterator<range_iterator<Child>>
+            ) {
+                return frd::to_address(frd::begin(this->_child()));
+            }
+
+            [[nodiscard]]
+            constexpr auto data() const
+            noexcept(
+                noexcept(frd::begin(frd::declval<const Child &>()))
+            )
+            requires (
+                contiguous_iterator<range_iterator<const Child>>
+            ) {
+                return frd::to_address(frd::begin(this->_child()));
+            }
+
+            [[nodiscard]]
+            constexpr auto size()
+            noexcept(
+                noexcept(frd::decay_copy(frd::end(frd::declval<Child &>()) - frd::begin(frd::declval<Child &>())))
+            )
+            requires (
+                forward_range<Child>       &&
+                sized_sentinel_for<
+                    range_sentinel<Child>,
+                    range_iterator<Child>
+                >
+            ) {
+                return frd::end(this->_child()) - frd::begin(this->_child());
+            }
+
+            [[nodiscard]]
+            constexpr auto size() const
+            noexcept(
+                noexcept(frd::decay_copy(frd::end(frd::declval<const Child &>()) - frd::begin(frd::declval<const Child &>())))
+            )
+            requires (
+                forward_range<const Child>       &&
+                sized_sentinel_for<
+                    range_sentinel<const Child>,
+                    range_iterator<const Child>
+                >
+            ) {
+                return frd::end(this->_child()) - frd::begin(this->_child());
+            }
+
+            [[nodiscard]]
+            constexpr decltype(auto) front()
+            noexcept(
+                noexcept(*frd::begin(frd::declval<Child &>()))
+            )
+            requires (
+                forward_range<Child>
+            ) {
+                return *frd::begin(this->_child());
+            }
+
+            [[nodiscard]]
+            constexpr decltype(auto) front() const
+            noexcept(
+                noexcept(*frd::begin(frd::declval<const Child &>()))
+            )
+            requires (
+                forward_range<const Child>
+            ) {
+                return *frd::begin(this->_child());
+            }
+
+            [[nodiscard]]
+            constexpr decltype(auto) back()
+            requires(
+                bidirectional_range<Child> &&
+                common_range<Child>
+            ) {
+                return *frd::prev(frd::end(this->_child()));
+            }
+
+            [[nodiscard]]
+            constexpr decltype(auto) back() const
+            requires(
+                bidirectional_range<const Child> &&
+                common_range<const Child>
+            ) {
+                return *frd::prev(frd::end(this->_child()));
+            }
+
+            /*
+                NOTE: Since the index operator has a parameter that depends on the child
+                view, it must be a templated function as otherwise the parameter type
+                would be evaluated on 'view_interface' instantiation, where 'Child' would
+                be an incomplete type.
+            */
+
+            template<random_access_range R = Child>
+            [[nodiscard]]
+            constexpr decltype(auto) operator [](const range_difference<R> n)
+            noexcept(
+                noexcept(frd::begin(frd::declval<Child &>())[n])
+            ) {
+                return frd::begin(this->_child())[n];
+            }
+
+            template<random_access_range R = const Child>
+            [[nodiscard]]
+            constexpr decltype(auto) operator [](const range_difference<R> n) const
+            noexcept(
+                noexcept(frd::begin(frd::declval<const Child &>())[n])
+            ) {
+                return frd::begin(this->_child())[n];
+            }
     };
 
     namespace views {
@@ -180,7 +325,11 @@ namespace frd {
         template<typename R>              \
         cls(R &&) -> cls<views::all_t<R>>
 
-    /* A view over an interval [start, end), similar to Python's 'range'. */
+    /*
+        A view over an interval [start, end), similar to Python's 'range'.
+
+        'std::ranges::enable_borrowed_range' is specialized to 'true' further down.
+    */
     template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
     class interval : public view_interface<interval<Start, End>> {
         public:
@@ -218,6 +367,11 @@ namespace frd {
                         weakly_addable_with<Start, difference_type>
                     ) {
                         return iterator(this->_value + delta);
+                    }
+
+                    /* Commutative addition. */
+                    friend constexpr iterator operator +(const difference_type delta, const iterator &it) noexcept {
+                        return it + delta;
                     }
 
                     constexpr iterator &operator +=(const difference_type delta) noexcept
@@ -313,12 +467,14 @@ namespace frd {
 
             constexpr explicit interval(const End &end) noexcept requires(integral<Start>) : _start(), _end(end) { }
 
-            constexpr interval(const Start &start, const End &end) : _start(start), _end(end) { }
+            constexpr interval(const Start &start, const End &end) noexcept : _start(start), _end(end) { }
 
+            [[nodiscard]]
             constexpr iterator begin() const noexcept {
                 return iterator(this->_start);
             }
 
+            [[nodiscard]]
             constexpr sentinel end() const noexcept {
                 return sentinel(this->_end);
             }
@@ -326,9 +482,6 @@ namespace frd {
 
     template<integral T>
     interval(T) -> interval<T, T>;
-
-    template<typename Start, typename End>
-    constexpr inline bool enable_borrowed_range<interval<Start, End>> = true;
 
     namespace views {
 
@@ -349,5 +502,13 @@ namespace frd {
     }
 
     #undef VIEW_DEDUCTION_GUIDE
+
+}
+
+/* Templated variable specializations must be in the proper namespace. */
+namespace std::ranges {
+
+    template<typename Start, typename End>
+    constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
 
 }

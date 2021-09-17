@@ -47,7 +47,10 @@ static_assert(frd::array{1, 2} == frd::array{1, 2});
 static_assert(frd::nothrow_swappable<frd::array<int, 2>>);
 static_assert(frd::to_array<char>({1, 2, 3}) == frd::array<char, 3>{1, 2, 3});
 
-static_assert(frd::size(frd::interval(5)) == 5);
+static_assert(frd::interval(5)[2] == 2);
+
+static_assert(frd::contiguous_range<frd::vector<int>>);
+static_assert(frd::view<frd::interval<int>>);
 
 consteval bool fuck() {
     struct S {

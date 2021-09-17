@@ -6,6 +6,15 @@
 /* Must detect Clang before GCC as it defines __GNUC__. */
 #if defined(__clang__)
 
+#error Clang is currently unsupported as https://bugs.llvm.org/show_bug.cgi?id=44833 plagues 'frd::view_interface'.
+
+/*
+    NOTE: We still have some code that differs based on GCC vs. Clang.
+
+    Unless we run into issues however, I'd prefer to keep that code for
+    whenever we can support Clang again, as I would still like to do that.
+*/
+
 #undef  FRD_PLATFORM_CLANG
 #define FRD_PLATFORM_CLANG true
 

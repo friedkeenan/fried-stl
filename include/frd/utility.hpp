@@ -119,7 +119,12 @@ namespace frd {
 
     }
 
-    /* Needs to be a callable object for ADL lookup to be checked. */
+    /*
+        Needs to be a callable object for ADL lookup to be checked.
+
+        'I' needs to be a specifiable template parameter, and so
+        cannot just be for the call operator, but rather the whole type.
+    */
     template<frd::size_t I>
     struct _get_fn {
         template<typename Getable>

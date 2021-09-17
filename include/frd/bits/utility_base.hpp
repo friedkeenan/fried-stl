@@ -41,14 +41,14 @@ namespace frd {
     }
 
     template<typename T>
-    T &&__declval_impl();
+    T &&_declval_impl();
 
     template<typename T>
     [[nodiscard]]
-    decltype(__declval_impl<T>()) declval() noexcept {
+    decltype(_declval_impl<T>()) declval() noexcept {
         static_assert(dependent_false<T>, "Don't use declval in evaluated contexts!");
 
-        return __declval_impl<T>();
+        return _declval_impl<T>();
     }
 
 }
