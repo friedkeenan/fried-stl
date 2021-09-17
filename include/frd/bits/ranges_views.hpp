@@ -578,7 +578,7 @@ namespace frd {
         /*
             A range adaptor closure that gets the iterators from a range.
 
-            'R' must be a borrowed range because 'interval' doesn't store a range.
+            'all_t<R>' must be a borrowed range because 'interval' doesn't store a range.
         */
         constexpr inline range_adaptor_closure iterators = []<viewable_range R>(R &&r)
         requires (
