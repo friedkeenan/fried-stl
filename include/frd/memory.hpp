@@ -107,7 +107,7 @@ namespace frd {
             #undef ATTR_ELSE_VALUE
 
             template<typename U> using _is_always_equal_impl = typename U::is_always_equal;
-            using _is_always_equal = detected_else<constant_holder<empty<Allocator>>, _is_always_equal_impl, Allocator>;
+            using _is_always_equal = detected_else<constant_holder<empty_type<Allocator>>, _is_always_equal_impl, Allocator>;
             static constexpr bool always_equal = _is_always_equal::value;
 
             template<typename U>

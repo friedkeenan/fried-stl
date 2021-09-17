@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <frd/bits/ranges_base.hpp>
 #include <frd/bits/ranges_operations.hpp>
 
@@ -165,10 +167,24 @@ namespace frd {
                 return static_cast<const Child &>(*this);
             }
 
+            /*
+                NOTE: Clang currently does not support this code, as it will evaluate the
+                'requires' clauses on 'view_interface' initialization, where 'Child' will
+                be an incomplete type, and not on member initialization, like GCC does.
+                I believe this to be a genuine bug, though it may also be a place where
+                there's ambiguity in the standard. See https://bugs.llvm.org/show_bug.cgi?id=44833
+
+                If we *really* wanted Clang support, we could make these all templated functions,
+                like the index operator further down. However, that would make those template arguments
+                specifiable, and also I'm not sure if I like making the code meaningfully worse just
+                to support Clang when it bugs/has a slightly different (imo incorrect) perspective
+                than GCC.
+            */
+
             [[nodiscard]]
             constexpr bool empty()
             noexcept(
-                noexcept(static_cast<bool>(frd::begin(frd::declval<Child &>()) == frd::end(frd::declval<Child &>())))
+                noexcept(static_cast<bool>(frd::begin(this->_child()) == frd::end(this->_child())))
             )
             requires (
                 forward_range<Child>
@@ -179,7 +195,7 @@ namespace frd {
             [[nodiscard]]
             constexpr bool empty() const
             noexcept(
-                noexcept(static_cast<bool>(frd::begin(frd::declval<const Child &>()) == frd::end(frd::declval<const Child &>())))
+                noexcept(static_cast<bool>(frd::begin(this->_child()) == frd::end(this->_child())))
             )
             requires (
                 forward_range<const Child>
@@ -190,7 +206,7 @@ namespace frd {
             [[nodiscard]]
             constexpr auto data()
             noexcept(
-                noexcept(frd::begin(frd::declval<Child &>()))
+                noexcept(frd::begin(this->_child()))
             )
             requires (
                 contiguous_iterator<range_iterator<Child>>
@@ -201,7 +217,7 @@ namespace frd {
             [[nodiscard]]
             constexpr auto data() const
             noexcept(
-                noexcept(frd::begin(frd::declval<const Child &>()))
+                noexcept(frd::begin(this->_child()))
             )
             requires (
                 contiguous_iterator<range_iterator<const Child>>
@@ -212,7 +228,7 @@ namespace frd {
             [[nodiscard]]
             constexpr auto size()
             noexcept(
-                noexcept(frd::decay_copy(frd::end(frd::declval<Child &>()) - frd::begin(frd::declval<Child &>())))
+                noexcept(frd::decay_copy(frd::end(this->_child()) - frd::begin(this->_child())))
             )
             requires (
                 forward_range<Child>       &&
@@ -227,7 +243,7 @@ namespace frd {
             [[nodiscard]]
             constexpr auto size() const
             noexcept(
-                noexcept(frd::decay_copy(frd::end(frd::declval<const Child &>()) - frd::begin(frd::declval<const Child &>())))
+                noexcept(frd::decay_copy(frd::end(this->_child()) - frd::begin(this->_child())))
             )
             requires (
                 forward_range<const Child>       &&
@@ -242,7 +258,7 @@ namespace frd {
             [[nodiscard]]
             constexpr decltype(auto) front()
             noexcept(
-                noexcept(*frd::begin(frd::declval<Child &>()))
+                noexcept(*frd::begin(this->_child()))
             )
             requires (
                 forward_range<Child>
@@ -253,7 +269,7 @@ namespace frd {
             [[nodiscard]]
             constexpr decltype(auto) front() const
             noexcept(
-                noexcept(*frd::begin(frd::declval<const Child &>()))
+                noexcept(*frd::begin(this->_child()))
             )
             requires (
                 forward_range<const Child>
@@ -290,7 +306,7 @@ namespace frd {
             [[nodiscard]]
             constexpr decltype(auto) operator [](const range_difference<R> n)
             noexcept(
-                noexcept(frd::begin(frd::declval<Child &>())[n])
+                noexcept(frd::begin(this->_child())[n])
             ) {
                 return frd::begin(this->_child())[n];
             }
@@ -299,20 +315,93 @@ namespace frd {
             [[nodiscard]]
             constexpr decltype(auto) operator [](const range_difference<R> n) const
             noexcept(
-                noexcept(frd::begin(frd::declval<const Child &>())[n])
+                noexcept(frd::begin(this->_child())[n])
             ) {
                 return frd::begin(this->_child())[n];
             }
     };
 
+    template<range R>
+    requires (object<R>)
+    class ref_view : public view_interface<ref_view<R>> {
+        public:
+            /* Does not need a body. */
+            static void _constructor_test(R &);
+            static void _constructor_test(R &&) = delete;
+
+            R *_rng;
+
+            template<typename T>
+            requires (
+                !same_as<remove_cvref<T>, ref_view>                &&
+                convertible_to<T, R &>                             &&
+                requires { _constructor_test(frd::declval<T>()); }
+            )
+            constexpr ref_view(T &&t) : _rng(std::addressof(t)) { }
+
+            [[nodiscard]]
+            constexpr R &base() const {
+                return *this->_rng;
+            }
+
+            [[nodiscard]]
+            constexpr range_iterator<R> begin() const
+            noexcept(
+                noexcept(frd::decay_copy(frd::begin(*this->_rng)))
+            ) {
+                return frd::begin(*this->_rng);
+            }
+
+            [[nodiscard]]
+            constexpr range_sentinel<R> end() const
+            noexcept(
+                noexcept(frd::decay_copy(frd::end(*this->_rng)))
+            ) {
+                return frd::end(*this->_rng);
+            }
+
+            [[nodiscard]]
+            constexpr bool empty() const
+            noexcept(
+                noexcept(frd::empty(*this->_rng))
+            )
+            requires (
+                possibly_empty_range<R>
+            ) {
+                return frd::empty(*this->_rng);
+            }
+
+            [[nodiscard]]
+            constexpr auto data() const
+            noexcept(
+                noexcept(frd::decay_copy(frd::data(*this->_rng)))
+            )
+            requires (
+                contiguous_range<R>
+            ) {
+                return frd::data(*this->_rng);
+            }
+    };
+
+    template<typename R>
+    ref_view(R&) -> ref_view<R>;
+
     namespace views {
+
+        template<typename R>
+        concept _can_ref_view = requires(R &&r) {
+            frd::ref_view(frd::forward<R>(r));
+        };
 
         constexpr inline range_adaptor_closure all = []<viewable_range R>(R &&r)
         requires (
-            view<R> /* || ... */
+            view<R>          ||
+            _can_ref_view<R> /* || ... */
         ) {
             if constexpr (view<R>) {
                 return frd::decay_copy(frd::forward<R>(r));
+            } else if constexpr (_can_ref_view<R>) {
+                return frd::ref_view(frd::forward<R>(r));
             } /* else ... */
         };
 
@@ -344,15 +433,16 @@ namespace frd {
                     Start _value;
 
                     constexpr iterator() = default;
-                    constexpr explicit iterator(const Start &value) noexcept : _value(value) { }
+                    constexpr explicit iterator(const Start &value) noexcept(nothrow_constructible_from<Start, const Start &>)
+                        : _value(value) { }
 
-                    constexpr iterator &operator ++() noexcept {
+                    constexpr iterator &operator ++() {
                         this->_value++;
 
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++, noexcept)
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++)
 
                     constexpr iterator &operator --() noexcept requires (weakly_decrementable<Start>) {
                         this->_value--;
@@ -360,9 +450,9 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, noexcept requires (weakly_decrementable<Start>))
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, requires (weakly_decrementable<Start>))
 
-                    constexpr iterator operator +(const difference_type delta) const noexcept
+                    constexpr iterator operator +(const difference_type delta) const
                     requires (
                         weakly_addable_with<Start, difference_type>
                     ) {
@@ -370,11 +460,11 @@ namespace frd {
                     }
 
                     /* Commutative addition. */
-                    friend constexpr iterator operator +(const difference_type delta, const iterator &it) noexcept {
+                    friend constexpr iterator operator +(const difference_type delta, const iterator &it) {
                         return it + delta;
                     }
 
-                    constexpr iterator &operator +=(const difference_type delta) noexcept
+                    constexpr iterator &operator +=(const difference_type delta)
                     requires (
                         in_place_addable_with<Start, difference_type>                           ||
                         (weakly_addable_with<Start, difference_type> && copy_assignable<Start>)
@@ -388,21 +478,21 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr difference_type operator -(const iterator &rhs) const noexcept
+                    constexpr difference_type operator -(const iterator &rhs) const
                     requires (
                         subtractable<Start>
                     ) {
                         return this->_value - rhs._value;
                     }
 
-                    constexpr iterator operator -(const difference_type delta) const noexcept
+                    constexpr iterator operator -(const difference_type delta) const
                     requires (
                         weakly_subtractable_with<Start, difference_type>
                     ) {
                         return iterator(this->_value - delta);
                     }
 
-                    constexpr iterator &operator -=(const difference_type &delta) noexcept
+                    constexpr iterator &operator -=(const difference_type &delta)
                     requires (
                         in_place_subtractable_with<Start, difference_type>                           ||
                         (weakly_subtractable_with<Start, difference_type> && copy_assignable<Start>)
@@ -416,28 +506,28 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr Start operator *() const noexcept {
+                    constexpr Start operator *() const noexcept(nothrow_constructible_from<Start, const Start &>) {
                         return this->_value;
                     }
 
-                    constexpr Start operator [](const difference_type delta) const noexcept
+                    constexpr Start operator [](const difference_type delta) const
                     requires (
                         weakly_addable_with<Start, difference_type>
                     ) {
                         return this->_value + delta;
                     }
 
-                    constexpr auto operator <=>(const iterator &rhs) const noexcept = default;
+                    constexpr auto operator <=>(const iterator &rhs) const = default;
 
                     /* Needed because of the '_sentinel' overload. */
-                    constexpr bool operator ==(const iterator &rhs) const noexcept
+                    constexpr bool operator ==(const iterator &rhs) const
                     requires (
                         equality_comparable<Start>
                     ) {
                         return this->_value == rhs._value;
                     }
 
-                    constexpr bool operator ==(const _sentinel &rhs) const noexcept {
+                    constexpr bool operator ==(const _sentinel &rhs) const {
                         return this->_value == rhs._value;
                     }
             };
@@ -492,7 +582,7 @@ namespace frd {
         */
         constexpr inline range_adaptor_closure iterators = []<viewable_range R>(R &&r)
         requires (
-            borrowed_range<R>
+            borrowed_range<all_t<R>>
         ) {
             auto all_rng = views::all(frd::forward<R>(r));
 
@@ -510,5 +600,8 @@ namespace std::ranges {
 
     template<typename Start, typename End>
     constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
+
+    template<typename R>
+    constexpr inline bool enable_borrowed_range<frd::ref_view<R>> = true;
 
 }

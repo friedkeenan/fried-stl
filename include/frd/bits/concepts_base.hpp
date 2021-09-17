@@ -328,6 +328,6 @@ namespace frd {
     concept trivially_copyable = std::is_trivially_copyable_v<T>;
 
     template<typename T>
-    concept empty = std::is_empty_v<T>;
+    concept empty_type = std::is_empty_v<T>;
 
 }

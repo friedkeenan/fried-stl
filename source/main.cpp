@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     const auto &[x, y] = fuck;
     std::printf("%d %d\n", x, y);
 
-    for (const auto i : frd::interval(5) | frd::views::iterators) {
+    for (const auto i : fuck | frd::views::iterators) {
         std::printf("%d\n", *i);
     }
 

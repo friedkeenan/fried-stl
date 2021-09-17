@@ -303,7 +303,7 @@ namespace frd {
 
     template<typename R>
     concept _member_end = requires(R &&r) {
-        frd::forward<R>(r).end();
+        { frd::forward<R>(r).end() } -> sentinel_for<range_iterator<R>>;
     };
 
     namespace _adl {
@@ -521,6 +521,52 @@ namespace frd {
 
     template<sized_range R>
     using range_size = decltype(frd::size(frd::declval<R &>()));
+
+    template<typename R>
+    concept _member_empty = requires(R &&r) {
+        static_cast<bool>(frd::forward<R>(r).empty());
+    };
+
+    template<typename R>
+    concept _size_empty = requires(R &&r) {
+        frd::size(frd::forward<R>(r)) == 0;
+    };
+
+    template<typename R>
+    concept _iterator_empty = requires(R &&r) {
+        requires forward_iterator<decltype(frd::begin(r))>;
+
+        static_cast<bool>(frd::begin(r) == frd::end(r));
+    };
+
+    template<range R>
+    requires (_member_empty<R> || _size_empty<R> || _iterator_empty<R>)
+    [[nodiscard]]
+    constexpr bool empty(R &&r)
+    noexcept(
+        []() {
+            if constexpr (_member_empty<R>) {
+                return noexcept(static_cast<bool>(frd::forward<R>(r).empty()));
+            } else if constexpr (_size_empty<R>) {
+                return noexcept(frd::size(frd::forward<R>(r)) == 0);
+            } else {
+                return noexcept(static_cast<bool>(frd::begin(r) == frd::end(r)));
+            }
+        }()
+    ) {
+        if constexpr (_member_empty<R>) {
+            return static_cast<bool>(frd::forward<R>(r).empty());
+        } else if constexpr (_size_empty<R>) {
+            return frd::size(frd::forward<R>(r)) == 0;
+        } else {
+            return static_cast<bool>(frd::begin(r) == frd::end(r));
+        }
+    }
+
+    template<typename R>
+    concept possibly_empty_range = range<R> && requires(R &&r) {
+        frd::empty(frd::forward<R>(r));
+    };
 
     template<typename R>
     concept viewable_range = range<R> && (
