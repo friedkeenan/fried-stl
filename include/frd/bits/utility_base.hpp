@@ -24,16 +24,6 @@ namespace frd {
         return static_cast<T &&>(t);
     }
 
-    template<typename T, typename U = T>
-    [[nodiscard]]
-    constexpr T exchange(T &obj, U &&new_value) {
-        T old_value = move(obj);
-
-        obj = forward<U>(new_value);
-
-        return old_value;
-    }
-
     template<typename T>
     [[nodiscard]]
     constexpr bool same_obj(const T &obj, const T &other) noexcept {
@@ -48,7 +38,7 @@ namespace frd {
     decltype(_declval_impl<T>()) declval() noexcept {
         static_assert(dependent_false<T>, "Don't use declval in evaluated contexts!");
 
-        return _declval_impl<T>();
+        return frd::_declval_impl<T>();
     }
 
 }

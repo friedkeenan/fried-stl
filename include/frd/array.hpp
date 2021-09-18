@@ -114,9 +114,15 @@ namespace frd {
                 return this->_elems[I];
             }
 
-            constexpr auto operator <=>(const array &rhs) const noexcept {
+            constexpr auto operator <=>(const array &rhs) const
+            noexcept(
+                nothrow_synthetic_three_way_comparable<const Element &>
+            )
+            requires (
+                synthetic_three_way_comparable<const Element &>
+            ) {
                 for (const auto i : interval(Size)) {
-                    const auto cmp = synthetic_three_way_compare(this->_elems[i], rhs._elems[i]);
+                    const auto cmp = frd::synthetic_three_way_compare(this->_elems[i], rhs._elems[i]);
 
                     if (cmp != 0) {
                         return cmp;

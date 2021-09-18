@@ -28,11 +28,9 @@ namespace frd {
                 return (
                     sizeof...(Tail) == sizeof...(CmpTail)
                 ) && (
-                    std::three_way_comparable_with<Head, CmpHead>   ||
-                    weakly_less_than_comparable_with<Head, CmpHead>
+                    synthetic_three_way_comparable_with<Head, CmpHead>
                 ) && ((
-                    std::three_way_comparable_with<Tail, CmpTail>   ||
-                    weakly_less_than_comparable_with<Tail, CmpTail>
+                    synthetic_three_way_comparable_with<Tail, CmpTail>
                 ) && ...);
             }
 
@@ -107,8 +105,12 @@ namespace frd {
 
             template<typename RhsHead, typename... RhsTail>
             requires (_is_comparable<RhsHead, RhsTail...>())
-            constexpr auto operator <=>(const tuple<RhsHead, RhsTail...> &rhs) const {
-                const auto cmp = synthetic_three_way_compare(this->_head, rhs._head);
+            constexpr auto operator <=>(const tuple<RhsHead, RhsTail...> &rhs) const
+            noexcept(
+                nothrow_synthetic_three_way_comparable_with<const Head &, const RhsHead &> &&
+                noexcept(this->_tail <=> rhs._tail)
+            ) {
+                const auto cmp = frd::synthetic_three_way_compare(this->_head, rhs._head);
 
                 if (cmp != 0) {
                     return cmp;

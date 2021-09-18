@@ -9,7 +9,7 @@ namespace frd {
 
     /* TODO: Delete unary '&' operators to avoid function pointer confusion? */
 
-    /* TODO: Should we bother propagating 'noexcept' for these? GCC doesn't. */
+    /* TODO: Should we bother propagating 'noexcept' for these? libstdc++ doesn't. */
 
     struct _advance_fn {
         template<iterator It>

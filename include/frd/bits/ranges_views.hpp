@@ -422,9 +422,6 @@ namespace frd {
     template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
     class interval : public view_interface<interval<Start, End>> {
         public:
-            /* Forward declare. */
-            class _sentinel;
-
             class iterator {
                 public:
                     using value_type      = Start;
@@ -517,18 +514,24 @@ namespace frd {
                         return this->_value + delta;
                     }
 
-                    constexpr auto operator <=>(const iterator &rhs) const = default;
+                    constexpr auto operator <=>(const iterator &rhs) const
+                    noexcept(
+                        nothrow_synthetic_three_way_comparable<const Start &>
+                    )
+                    requires (
+                        synthetic_three_way_comparable<const Start &>
+                    ) {
+                        return frd::synthetic_three_way_compare(this->_value, rhs._value);
+                    }
 
-                    /* Needed because of the '_sentinel' overload. */
                     constexpr bool operator ==(const iterator &rhs) const
+                    noexcept(
+                        noexcept(static_cast<bool>(this->_value == rhs._value))
+                    )
                     requires (
                         equality_comparable<Start>
                     ) {
-                        return this->_value == rhs._value;
-                    }
-
-                    constexpr bool operator ==(const _sentinel &rhs) const {
-                        return this->_value == rhs._value;
+                        return static_cast<bool>(this->_value == rhs._value);
                     }
             };
 
@@ -538,26 +541,76 @@ namespace frd {
                 public:
                     End _value;
 
-                constexpr _sentinel() = default;
-                constexpr explicit _sentinel(const End &value) noexcept : _value(value) { }
+                    constexpr _sentinel() = default;
+                    constexpr explicit _sentinel(const End &value) noexcept : _value(value) { }
 
-                constexpr bool operator ==(const iterator &rhs) const noexcept {
-                    return this->_value == rhs._value;
-                }
+                    constexpr iter_difference<Start> operator -(const iterator &rhs) const
+                    requires (
+                        weakly_subtractable_with<const Start, const End, iter_difference<Start>>
+                    ) {
+                        return this->_value - rhs._value;
+                    }
+
+                    friend constexpr iter_difference<Start> operator -(const iterator &lhs, const _sentinel &rhs)
+                    requires (
+                        weakly_subtractable_with<const Start, const End, iter_difference<Start>>
+                    ) {
+                        return lhs._value - rhs._value;
+                    }
+
+                    constexpr auto operator <=>(const iterator &rhs) const
+                    noexcept(
+                        nothrow_synthetic_three_way_comparable_with<const End &, const Start &>
+                    )
+                    requires (
+                        synthetic_three_way_comparable_with<const End &, const Start &>
+                    ) {
+                        return frd::synthetic_three_way_compare(this->_value, rhs._value);
+                    }
+
+                    /* Commutative spaceship. */
+                    friend constexpr auto operator <=>(const iterator &lhs, const _sentinel &rhs)
+                    noexcept(
+                        nothrow_synthetic_three_way_comparable_with<const Start &, const End &>
+                    )
+                    requires (
+                        synthetic_three_way_comparable_with<const Start &, const End &>
+                    ) {
+                        return frd::synthetic_three_way_compare(lhs._value, rhs._value);
+                    }
+
+                    constexpr bool operator ==(const iterator &rhs) const
+                    noexcept(
+                        noexcept(static_cast<bool>(this->_value == rhs._value))
+                    ) {
+                        return static_cast<bool>(this->_value == rhs._value);
+                    }
+
+                    /* Commutative equality. */
+                    friend constexpr bool operator ==(const iterator &lhs, const _sentinel &rhs)
+                    noexcept(
+                        noexcept(static_cast<bool>(lhs._value == rhs._value))
+                    ) {
+                        return static_cast<bool>(lhs._value == rhs._value);
+                    }
             };
 
             /*
                 If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel.
-                This allows certain optimizations with regards to iterator operations.
+                This enables certain iterator operations and certain optimizations for said operations.
             */
             using sentinel = conditional<same_as<Start, End>, iterator, _sentinel>;
 
             Start _start;
             End   _end;
 
-            constexpr explicit interval(const End &end) noexcept requires(integral<Start>) : _start(), _end(end) { }
+            constexpr interval(const Start &start, const End &end) noexcept : _start(start), _end(end) {
+                if constexpr (weakly_less_than_comparable_with<const Start &, const End &>) {
+                    FRD_ASSERT(start < end, "Interval malformed!");
+                }
+            }
 
-            constexpr interval(const Start &start, const End &end) noexcept : _start(start), _end(end) { }
+            constexpr explicit interval(const End &end) noexcept requires(integral<Start>) : interval(Start{}, end) { }
 
             [[nodiscard]]
             constexpr iterator begin() const noexcept {

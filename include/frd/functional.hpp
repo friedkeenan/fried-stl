@@ -93,15 +93,15 @@ namespace frd {
 
     template<typename Invocable, typename... Args>
     concept invocable = requires(Invocable &&inv, Args &&...args) {
-        invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...);
+        ::frd::invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...);
     };
 
     template<typename Invocable, typename... Args>
-    concept nothrow_invocable = invocable<Invocable, Args...> && noexcept(invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
+    concept nothrow_invocable = invocable<Invocable, Args...> && noexcept(frd::invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
 
     template<typename Invocable, typename... Args>
     requires (invocable<Invocable, Args...>)
-    using invoke_result = decltype(invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
+    using invoke_result = decltype(frd::invoke(frd::declval<Invocable>(), frd::declval<Args>()...));
 
     /* NOTE: We add [[nodiscard]] since if you're specifying a return type, you probably care about the return value. */
     template<typename Ret, typename Invocable, typename... Args>
@@ -113,9 +113,9 @@ namespace frd {
     ) {
         if constexpr (void_type<Ret>) {
             /* If 'Ret' is a void type, discard the return value. */
-            static_cast<void>(invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...));
+            static_cast<void>(frd::invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...));
         } else {
-            return invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...);
+            return frd::invoke(frd::forward<Invocable>(inv), frd::forward<Args>(args)...);
         }
     }
 

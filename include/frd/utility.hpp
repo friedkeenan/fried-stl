@@ -18,6 +18,21 @@ namespace frd {
         return frd::forward<T>(t);
     }
 
+    template<typename T, typename U = T>
+    [[nodiscard]]
+    constexpr T exchange(T &obj, U &&new_value)
+    noexcept(
+        nothrow_constructible_from<T, T &&>             &&
+        noexcept(obj = frd::forward<U>(new_value)) &&
+        nothrow_constructible_from<T, T>
+    ){
+        T old_value = frd::move(obj);
+
+        obj = frd::forward<U>(new_value);
+
+        return old_value;
+    }
+
     template<typename T, typename U>
     concept _std_swappable = requires(T &&t, U &&u) {
         std::swap(frd::forward<T>(t), frd::forward<U>(u));
@@ -58,11 +73,7 @@ namespace frd {
                 } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
                     return noexcept(swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs)));
                 } else {
-                    return (
-                        noexcept(remove_cvref<LHS>(frd::move(lhs)))                    &&
-                        noexcept(lhs = frd::move(rhs))                                 &&
-                        noexcept(rhs = frd::move(frd::declval<remove_cvref<LHS> &>()))
-                    );
+                    return noexcept(rhs = frd::exchange(lhs, frd::move(rhs)));
                 }
             }()
         ) {
@@ -71,9 +82,7 @@ namespace frd {
             } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
                 swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
             } else {
-                remove_cvref<LHS> tmp_lhs = frd::move(lhs);
-                lhs                       = frd::move(rhs);
-                rhs                       = frd::move(tmp_lhs);
+                rhs = frd::exchange(lhs, frd::move(rhs));
             }
         }
     };
@@ -174,10 +183,19 @@ namespace frd {
     }
 
     template<typename LHS, typename RHS>
-    requires (std::three_way_comparable_with<const LHS &, const RHS &> || weakly_less_than_comparable_with<const LHS &, const RHS &>)
-    constexpr auto synthetic_three_way_compare(const LHS &lhs, const RHS &rhs) noexcept {
-        if constexpr (std::three_way_comparable_with<const LHS &, const RHS &>) {
-            return lhs <=> rhs;
+    requires (std::three_way_comparable_with<LHS, RHS> || weakly_less_than_comparable_with<LHS, RHS>)
+    constexpr auto synthetic_three_way_compare(LHS &&lhs, RHS &&rhs)
+    noexcept(
+        []() {
+            if constexpr (std::three_way_comparable_with<LHS, RHS>) {
+                return noexcept(frd::decay_copy(frd::forward<LHS>(lhs) <=> frd::forward<RHS>(rhs)));
+            } else {
+                return noexcept(lhs < rhs) && noexcept(rhs < lhs);
+            }
+        }()
+    ) {
+        if constexpr (std::three_way_comparable_with<LHS, RHS>) {
+            return frd::forward<LHS>(lhs) <=> frd::forward<RHS>(rhs);
         } else {
             if (lhs < rhs) {
                 return std::weak_ordering::less;
@@ -190,6 +208,22 @@ namespace frd {
             return std::weak_ordering::equivalent;
         }
     }
+
+    template<typename LHS, typename RHS>
+    concept synthetic_three_way_comparable_with = requires(LHS &&lhs, RHS &&rhs) {
+        ::frd::synthetic_three_way_compare(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
+    };
+
+    template<typename T>
+    concept synthetic_three_way_comparable = synthetic_three_way_comparable_with<T, T>;
+
+    template<typename LHS, typename RHS>
+    concept nothrow_synthetic_three_way_comparable_with = synthetic_three_way_comparable_with<LHS, RHS> && (
+        noexcept(frd::synthetic_three_way_compare(frd::declval<LHS>(), frd::declval<RHS>()))
+    );
+
+    template<typename T>
+    concept nothrow_synthetic_three_way_comparable = nothrow_synthetic_three_way_comparable_with<T, T>;
 
     template<frd::size_t... I>
     using index_sequence = std::integer_sequence<frd::size_t, I...>;

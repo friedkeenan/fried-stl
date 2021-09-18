@@ -41,6 +41,10 @@ namespace frd {
             return (this->_sign <=> 0);
         }
 
+        constexpr bool operator ==(const _only_zero rhs) const noexcept {
+            return (*this <=> rhs) == 0;
+        }
+
         template<arithmetic T>
         constexpr explicit operator T() const noexcept {
             return static_cast<T>(this->_sign);
