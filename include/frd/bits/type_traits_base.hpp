@@ -8,21 +8,36 @@
 
 namespace frd {
 
+    namespace unsafe {
+
+        /*
+            An implementation of 'std::integral_constant' where you
+            don't need to specify the type.
+
+            It would be incorrect to use this in certain situations, such
+            as with 'std::tuple_size' as it is UB to have a specialization
+            of 'std::tuple_size' not inherit from 'std::integral_constant<std::size_t, N>'.
+        */
+        template<auto v>
+        struct constant_holder {
+            using value_type = decltype(v);
+            using type       = constant_holder;
+
+            static constexpr value_type value = v;
+
+            constexpr operator value_type() const noexcept {
+                return value;
+            }
+
+            constexpr value_type operator ()() const noexcept {
+                return value;
+            }
+        };
+
+    }
+
     template<auto v>
-    struct constant_holder {
-        using value_type = decltype(v);
-        using type       = constant_holder;
-
-        static constexpr value_type value = v;
-
-        constexpr operator value_type() const noexcept {
-            return value;
-        }
-
-        constexpr value_type operator ()() const noexcept {
-            return value;
-        }
-    };
+    using constant_holder = std::integral_constant<decltype(v), v>;
 
     using false_holder = constant_holder<false>;
     using true_holder  = constant_holder<true>;
