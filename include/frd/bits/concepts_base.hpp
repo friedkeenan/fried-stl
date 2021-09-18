@@ -141,8 +141,8 @@ namespace frd {
     concept adl_discoverable = class_type<remove_cvref<T>> || enum_type<remove_cvref<T>>;
 
     template<typename T>
-    concept incomplete = !requires {
-        /* You cannot find the size of incomplete types. */
+    concept incomplete = !function<T> && !requires {
+        /* You cannot find the size of incomplete or function types. */
         sizeof(T);
     };
 
