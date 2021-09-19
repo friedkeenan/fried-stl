@@ -61,7 +61,7 @@ namespace frd {
                 if (frd::abs(n) > frd::abs(diff)) {
                     (*this)(it, bound);
 
-                    return n - diff;;
+                    return n - diff;
                 }
 
                 (*this)(it, n);

@@ -5,9 +5,9 @@
 #include <concepts>
 
 #include <frd/bits/utility_base.hpp>
+#include <frd/bits/arithmetic_base.hpp>
 #include <frd/bits/concepts_base.hpp>
 
-#include <frd/arithmetic.hpp>
 #include <frd/type_traits.hpp>
 
 namespace frd {
@@ -110,68 +110,6 @@ namespace frd {
     template<typename T>
     concept nothrow_swappable = nothrow_swappable_with<T, T>;
 
-    template<typename T>
-    concept _member_get = requires(T &&t) {
-        frd::forward<T>(t).template get<frd::size_t{0}>();
-    };
-
-    namespace _adl {
-
-        /* Lookup for '_adl_get'. */
-        template<frd::size_t>
-        void get() = delete;
-
-        template<typename T>
-        concept _adl_get = adl_discoverable<T> && requires(T &&t) {
-            get<frd::size_t{0}>(frd::forward<T>(t));
-        };
-
-    }
-
-    /*
-        Needs to be a callable object for ADL lookup to be checked.
-
-        'I' needs to be a specifiable template parameter, and so
-        cannot just be for the call operator, but rather the whole type.
-    */
-    template<frd::size_t I>
-    struct _get_fn {
-        template<typename Getable>
-        requires (_member_get<Getable> || _adl::_adl_get<Getable>)
-        constexpr decltype(auto) get(Getable &&getable) const
-        noexcept(
-            []() {
-                if constexpr (_member_get<Getable>) {
-                    return noexcept(frd::forward<Getable>(getable).template get<I>());
-                } else {
-                    return noexcept(get<I>(frd::forward<Getable>(getable)));
-                }
-            }()
-        ) {
-            if constexpr (_member_get<Getable>) {
-                return frd::forward<Getable>(getable).template get<I>();
-            } else {
-                return get<I>(frd::forward<Getable>(getable));
-            }
-        }
-    };
-
-    /* Needs to be in own namespace to avoid ADL conflicts. */
-    namespace {
-
-        template<frd::size_t I>
-        constexpr inline _get_fn<I> get;
-
-    }
-
-    template<typename T>
-    concept getable = requires(T &&t) {
-        ::frd::get<frd::size_t{0}>(frd::forward<T>(t));
-    };
-
-    template<typename T>
-    concept nothrow_getable = getable<T> && noexcept(frd::get<frd::size_t{0}>(frd::declval<T>()));
-
     template<integral T>
     constexpr make_signed<T> to_signed(const T value) noexcept {
         return static_cast<make_signed<T>>(value);
@@ -232,23 +170,4 @@ namespace frd {
     template<frd::size_t N>
     using make_index_sequence = std::make_integer_sequence<frd::size_t, N>;
 
-    [[noreturn]]
-    inline void unreachable() {
-        /* Here we can have different implementations for unreachable code. */
-
-        __builtin_unreachable();
-    }
-
-    [[noreturn]]
-    inline void unreachable(const char *msg) {
-        FRD_UNUSED(msg);
-
-        frd::unreachable();
-    }
-
 }
-
-/* NOTE: 'FRD_ASSERT' does not give a meaningful error at runtime, but instead ends up invoking undefined behavior. */
-
-/* Don't use braced-if so that we require a semicolon after the macro. */
-#define FRD_ASSERT(expr, ...) if (!(expr)) ::frd::unreachable()

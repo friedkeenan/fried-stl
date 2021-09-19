@@ -54,6 +54,9 @@ static_assert(frd::view<frd::interval<int>>);
 
 static_assert(frd::sign(1) > 0);
 
+static_assert(std::tuple_size<frd::tuple<int, int>>::value == 2);
+static_assert(frd::same_as<frd::tuple_element<1, frd::tuple<int, int>>, int>);
+
 consteval bool fuck() {
     struct S {
         bool value = false;
@@ -88,10 +91,12 @@ int main(int argc, char **argv) {
 
     const auto fuck = frd::array{1, 2};
 
+    std::printf("%d\n", frd::get<1>(fuck));
+
     const auto &[x, y] = fuck;
     std::printf("%d %d\n", x, y);
 
-    for (const auto i : fuck | frd::views::iterators) {
+    for (const auto i : frd::subrange(fuck) | frd::views::iterators) {
         std::printf("%d\n", *i);
     }
 

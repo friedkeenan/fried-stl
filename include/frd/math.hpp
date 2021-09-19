@@ -5,50 +5,51 @@
 
 namespace frd {
 
-    struct sign {
-        struct _only_zero {
-            /*
-                Make implicit conversion from a pointer, as only
-                zero-like literals can be implicitly converted to a pointer.
-            */
-            constexpr _only_zero(_only_zero *) { }
-        };
+    class sign {
+        public:
+            struct _only_zero {
+                /*
+                    Make implicit conversion from a pointer, as only
+                    zero-like literals can be implicitly converted to a pointer.
+                */
+                consteval _only_zero(_only_zero *) { }
+            };
 
-        static const sign zero;
-        static const sign positive;
-        static const sign negative;
+            static const sign zero;
+            static const sign positive;
+            static const sign negative;
 
-        frd::int8_t _sign;
+            frd::int8_t _sign;
 
-        template<arithmetic T>
-        constexpr explicit sign(const T num) noexcept {
-            if (num > 0) {
-                this->_sign = 1;
-            } else if (num < 0) {
-                this->_sign = -1;
-            } else {
-                this->_sign = 0;
+            template<arithmetic T>
+            constexpr explicit sign(const T num) noexcept {
+                if (num > 0) {
+                    this->_sign = 1;
+                } else if (num < 0) {
+                    this->_sign = -1;
+                } else {
+                    this->_sign = 0;
+                }
             }
-        }
 
-        constexpr bool operator ==(const sign rhs) const noexcept {
-            return this->_sign == rhs._sign;
-        }
+            constexpr bool operator ==(const sign rhs) const noexcept {
+                return this->_sign == rhs._sign;
+            }
 
-        constexpr auto operator <=>(const _only_zero rhs) const noexcept {
-            FRD_UNUSED(rhs);
+            constexpr auto operator <=>(const _only_zero rhs) const noexcept {
+                FRD_UNUSED(rhs);
 
-            return (this->_sign <=> 0);
-        }
+                return (this->_sign <=> 0);
+            }
 
-        constexpr bool operator ==(const _only_zero rhs) const noexcept {
-            return (*this <=> rhs) == 0;
-        }
+            constexpr bool operator ==(const _only_zero rhs) const noexcept {
+                return (*this <=> rhs) == 0;
+            }
 
-        template<arithmetic T>
-        constexpr explicit operator T() const noexcept {
-            return static_cast<T>(this->_sign);
-        }
+            template<arithmetic T>
+            constexpr explicit operator T() const noexcept {
+                return static_cast<T>(this->_sign);
+            }
     };
 
     constexpr inline sign sign::zero     = sign( 0);

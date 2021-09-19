@@ -3,8 +3,21 @@
 #include <frd/bits/concepts_base.hpp>
 
 #include <frd/utility.hpp>
+#include <frd/type_traits.hpp>
 
 namespace frd {
+
+    template<typename From, typename To>
+    concept convertible_to_non_slicing = (
+        convertible_to<From, To>                           &&
+        (
+            (!pointer<decay<From>> || !pointer<decay<To>>) ||
+            same_as_without_cv<
+                remove_pointer<decay<From>>,
+                remove_pointer<decay<From>>
+            >
+        )
+    );
 
     template<typename T>
     concept movable = (

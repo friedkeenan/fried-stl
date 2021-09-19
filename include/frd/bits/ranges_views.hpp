@@ -5,6 +5,7 @@
 #include <frd/bits/ranges_base.hpp>
 #include <frd/bits/ranges_operations.hpp>
 
+#include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
 #include <frd/functional.hpp>
 #include <frd/type_traits.hpp>
@@ -386,6 +387,300 @@ namespace frd {
     template<typename R>
     ref_view(R&) -> ref_view<R>;
 
+    template<typename PairLike, typename T, typename U>
+    concept _pair_like_convertible_from = (
+        !range<PairLike> &&
+        pair_like<PairLike> &&
+        constructible_from<PairLike, T, U> &&
+        convertible_to_non_slicing<T, tuple_element<0, PairLike>> &&
+        convertible_to<U, tuple_element<1, PairLike>>
+    );
+
+    enum class subrange_kind : bool {
+        unsized,
+        sized,
+    };
+
+    template<
+        iterator It,
+        sentinel_for<It> S = It,
+        subrange_kind Kind = []() {
+            if constexpr (sized_sentinel_for<S, It>) {
+                return subrange_kind::sized;
+            } else {
+                return subrange_kind::unsized;
+            }
+        }()
+    >
+    class subrange : public view_interface<subrange<It, S, Kind>> {
+        public:
+            using difference_type = iter_difference<It>;
+            using size_type       = make_unsigned<difference_type>;
+
+            static constexpr bool StoreSize = !sized_sentinel_for<S, It> && Kind == subrange_kind::sized;
+
+            struct _data_without_size {
+                It it;
+                S  bound;
+            };
+
+            struct _data_with_size {
+                It        it;
+                S         bound;
+                size_type size = 0;
+            };
+
+            /* Only store the size if we need to. */
+            using data = conditional<StoreSize, _data_with_size, _data_without_size>;
+
+            data _data;
+
+            constexpr subrange() requires (default_constructible<It>) = default;
+
+            template<convertible_to_non_slicing<It> ItOther>
+            constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _data({frd::move(it), bound}) { }
+
+            template<convertible_to_non_slicing<It> ItOther>
+            requires (Kind == subrange_kind::sized && !StoreSize)
+            constexpr subrange(ItOther it, S bound, const size_type size) : _data({frd::move(it), bound}) { }
+
+            template<convertible_to_non_slicing<It> ItOther>
+            requires (Kind == subrange_kind::sized && StoreSize)
+            constexpr subrange(ItOther it, S bound, const size_type size) : _data({frd::move(it), bound, size}) { }
+
+            template<borrowed_range R>
+            requires (
+                convertible_to_non_slicing<range_iterator<R>, It> &&
+                convertible_to<range_sentinel<R>, S>              &&
+                Kind == subrange_kind::sized
+            )
+            constexpr subrange(R &&r, const size_type size) : subrange(frd::begin(r), frd::end(r), size) { }
+
+            template<typename R>
+            requires (
+                !same_as<decay<R>, subrange>                      &&
+                borrowed_range<R>                                 &&
+                convertible_to_non_slicing<range_iterator<R>, It> &&
+                convertible_to<range_sentinel<R>, S>              &&
+                (StoreSize && sized_range<R>)
+            )
+            constexpr subrange(R &&r) : subrange(r, frd::size(r)) { }
+
+            template<typename R>
+            requires (
+                !same_as<decay<R>, subrange>                      &&
+                borrowed_range<R>                                 &&
+                convertible_to_non_slicing<range_iterator<R>, It> &&
+                convertible_to<range_sentinel<R>, S>              &&
+                (!StoreSize)
+            )
+            constexpr subrange(R &&r) : subrange(frd::begin(r), frd::end(r)) { }
+
+            constexpr bool empty() const
+            noexcept(
+                noexcept(static_cast<bool>(this->_data.it == this->_data.bound))
+            ) {
+                return static_cast<bool>(this->_data.it == this->_data.bound);
+            }
+
+            constexpr size_type size() const
+            noexcept(
+                [this]() {
+                    if constexpr (StoreSize) {
+                        return true;
+                    } else {
+                        return noexcept(static_cast<size_type>(this->_data.bound - this->_data.it));
+                    }
+                }
+            )
+            requires (
+                Kind == subrange_kind::sized
+            ) {
+                if constexpr (StoreSize) {
+                    return this->_data.size;
+                } else {
+                    return static_cast<size_type>(this->_data.bound - this->_data.it);
+                }
+            }
+
+            constexpr It begin() const
+            noexcept(
+                nothrow_constructible_from<It, const It &>
+            )
+            requires (
+                copyable<It>
+            ) {
+                return this->_data.it;
+            }
+
+            constexpr It begin()
+            noexcept(
+                nothrow_constructible_from<It, It &&>
+            )
+            requires (
+                !copyable<It>
+            ) {
+                return frd::move(this->_data.it);
+            }
+
+            constexpr S end() const
+            noexcept(
+                nothrow_constructible_from<S, const S &>
+            ) {
+                return this->_data.bound;
+            }
+
+            template<frd::size_t I>
+            requires ((I < 2) && copyable<It>)
+            constexpr auto get() const &
+            noexcept(
+                []() {
+                    if constexpr (I == 0) {
+                        return nothrow_constructible_from<It, const It &>;
+                    } else {
+                        return nothrow_constructible_from<S, const S &>;
+                    }
+                }()
+            ) {
+                if constexpr (I == 0) {
+                    return this->_data.it;
+                } else {
+                    return this->_data.bound;
+                }
+            }
+
+            template<frd::size_t I>
+            requires ((I < 2))
+            constexpr auto get() &&
+            noexcept(
+                []() {
+                    if constexpr (I == 0) {
+                        if constexpr (copyable<It>) {
+                            return nothrow_constructible_from<It, It &>;
+                        } else {
+                            return nothrow_constructible_from<It, It &&>;
+                        }
+                    } else {
+                        return nothrow_constructible_from<S, S &>;
+                    }
+                }()
+            ) {
+                if constexpr (I == 0) {
+                    /* Only move the iterator if we have to. */
+                    if constexpr (copyable<It>) {
+                        return this->_data.it;
+                    } else {
+                        return frd::move(this->_data.it);
+                    }
+                } else {
+                    return this->_data.bound;
+                }
+            }
+
+            template<typename PairLike>
+            requires (
+                !same_as<decay<PairLike>, subrange>                          &&
+                _pair_like_convertible_from<PairLike, const It &, const S &>
+            )
+            constexpr operator PairLike() const {
+                return PairLike(this->_data.it, this->_data.bound);
+            }
+
+            constexpr subrange &advance(const difference_type n) {
+                /* TODO: Do we need to worry about the stored size here? */
+                const auto diff = frd::advance(this->_data.it, n, this->_data.bound);
+
+                if constexpr (StoreSize) {
+                    this->_data.size -= frd::to_unsigned(n - diff);
+                }
+
+                return *this;
+            }
+
+            [[nodiscard]]
+            constexpr subrange next(const difference_type n) const &
+            requires (
+                forward_iterator<It>
+            ) {
+                auto new_rng = *this;
+                new_rng.advance(n);
+
+                return new_rng;
+            }
+
+            [[nodiscard]]
+            constexpr subrange next(const difference_type n) &&
+            requires (
+                forward_iterator<It>
+            ) {
+                this->advance(n);
+
+                return frd::move(*this);
+            }
+
+            [[nodiscard]]
+            constexpr subrange prev(const difference_type n = 1) const &
+            requires (
+                bidirectional_iterator<It>
+            ) {
+                auto new_rng = *this;
+                new_rng.advance(-n);
+
+                return new_rng;
+            }
+
+            [[nodiscard]]
+            constexpr subrange prev(const difference_type n = 1) &&
+            requires (
+                bidirectional_iterator<It>
+            ) {
+                this->advance(-n);
+
+                return frd::move(*this);
+            }
+    };
+
+    template<iterator It, sentinel_for<It> S>
+    subrange(It, S) -> subrange<It, S>;
+
+    template<iterator It, sentinel_for<It> S>
+    subrange(It, S, make_unsigned<iter_difference<It>>) -> subrange<It, S, subrange_kind::sized>;
+
+    template<borrowed_range R>
+    subrange(R &&) -> subrange<
+        range_iterator<R>,
+        range_sentinel<R>,
+        []() {
+            if constexpr (
+                sized_range<R>                                           ||
+                sized_sentinel_for<range_sentinel<R>, range_iterator<R>>
+            ) {
+                return subrange_kind::sized;
+            } else {
+                return subrange_kind::unsized;
+            }
+        }()
+    >;
+
+    template<borrowed_range R>
+    subrange(R &&, make_unsigned<range_difference<R>>) -> subrange<
+        range_iterator<R>,
+        range_sentinel<R>,
+        subrange_kind::sized
+    >;
+
+    template<typename It, typename S, subrange_kind Kind>
+    constexpr inline frd::size_t tuple_size<subrange<It, S, Kind>> = 2;
+
+    template<typename It, typename S, subrange_kind Kind>
+    struct tuple_element_holder<0, subrange<It, S, Kind>> : type_holder<It> { };
+
+    template<typename It, typename S, subrange_kind Kind>
+    struct tuple_element_holder<1, subrange<It, S, Kind>> : type_holder<S> { };
+
+    template<frd::size_t I, typename It, typename S, subrange_kind Kind>
+    struct tuple_element_holder<I, const subrange<It, S, Kind>> : tuple_element_holder<I, subrange<It, S, Kind>> { };
+
     namespace views {
 
         template<typename R>
@@ -393,16 +688,24 @@ namespace frd {
             frd::ref_view(frd::forward<R>(r));
         };
 
+        template<typename R>
+        concept _can_subrange = requires(R &&r) {
+            frd::subrange(frd::forward<R>(r));
+        };
+
         constexpr inline range_adaptor_closure all = []<viewable_range R>(R &&r)
         requires (
             view<R>          ||
-            _can_ref_view<R> /* || ... */
+            _can_ref_view<R> ||
+            _can_subrange<R>
         ) {
             if constexpr (view<R>) {
                 return frd::decay_copy(frd::forward<R>(r));
             } else if constexpr (_can_ref_view<R>) {
                 return frd::ref_view(frd::forward<R>(r));
-            } /* else ... */
+            } else {
+                return frd::subrange(frd::forward<R>(r));
+            }
         };
 
         template<viewable_range R>
@@ -568,30 +871,11 @@ namespace frd {
                         return frd::synthetic_three_way_compare(this->_value, rhs._value);
                     }
 
-                    /* Commutative spaceship. */
-                    friend constexpr auto operator <=>(const iterator &lhs, const _sentinel &rhs)
-                    noexcept(
-                        nothrow_synthetic_three_way_comparable_with<const Start &, const End &>
-                    )
-                    requires (
-                        synthetic_three_way_comparable_with<const Start &, const End &>
-                    ) {
-                        return frd::synthetic_three_way_compare(lhs._value, rhs._value);
-                    }
-
                     constexpr bool operator ==(const iterator &rhs) const
                     noexcept(
                         noexcept(static_cast<bool>(this->_value == rhs._value))
                     ) {
                         return static_cast<bool>(this->_value == rhs._value);
-                    }
-
-                    /* Commutative equality. */
-                    friend constexpr bool operator ==(const iterator &lhs, const _sentinel &rhs)
-                    noexcept(
-                        noexcept(static_cast<bool>(lhs._value == rhs._value))
-                    ) {
-                        return static_cast<bool>(lhs._value == rhs._value);
                     }
             };
 
@@ -629,6 +913,11 @@ namespace frd {
     namespace views {
 
         /*
+            TODO: Should we conditonally only do 'ref_view' or 'subrange'
+            to heighten the probability for a borrowed range?
+        */
+
+        /*
             A range adaptor closure that gets the iterators from a range.
 
             'all_t<R>' must be a borrowed range because 'interval' doesn't store a range.
@@ -651,10 +940,13 @@ namespace frd {
 /* Templated variable specializations must be in the proper namespace. */
 namespace std::ranges {
 
-    template<typename Start, typename End>
-    constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
-
     template<typename R>
     constexpr inline bool enable_borrowed_range<frd::ref_view<R>> = true;
+
+    template<typename It, typename S, frd::subrange_kind Kind>
+    constexpr inline bool enable_borrowed_range<frd::subrange<It, S, Kind>> = true;
+
+    template<typename Start, typename End>
+    constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
 
 }

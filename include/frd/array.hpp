@@ -2,6 +2,7 @@
 
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
+#include <frd/tuple.hpp>
 #include <frd/ranges.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
@@ -142,6 +143,12 @@ namespace frd {
     array(Head, Rest...) -> array<Head, sizeof...(Rest) + 1>;
 
     template<typename T, frd::size_t N>
+    constexpr inline frd::size_t tuple_size<array<T, N>> = N;
+
+    template<frd::size_t I, typename T, frd::size_t N>
+    struct tuple_element_holder<I, array<T, N>> : type_holder<T> { };
+
+    template<typename T, frd::size_t N>
     void swap(array<T, N> &lhs, array<T, N> &rhs) noexcept(noexcept(lhs.swap(rhs))) {
         lhs.swap(rhs);
     }
@@ -165,15 +172,5 @@ namespace frd {
     constexpr array<remove_cv<T>, N> to_array(T (&&arr)[N]) {
         return _to_array(frd::move(arr), make_index_sequence<N>{});
     }
-
-}
-
-namespace std {
-
-    template<typename T, frd::size_t N>
-    struct tuple_size<frd::array<T, N>> : frd::constant_holder<N> { };
-
-    template<std::size_t I, typename T, frd::size_t N>
-    struct tuple_element<I, frd::array<T, N>> : frd::type_holder<T> { };
 
 }
