@@ -174,6 +174,13 @@ namespace frd {
     template<typename S, typename It>
     concept sentinel_for = semiregular<S> && iterator<It> && weakly_equality_comparable_with<S, It>;
 
+    /*
+        NOTE: It would be nice to shim `std::disable_sized_sentinel_for` and other
+        range-related helper templates, but since they are variable templates and
+        not types like 'std::tuple_size', I do not know of a way to do so while still
+        also having our helper templates work with stuff which uses the STL templates.
+    */
+
     template<typename S, typename It>
     concept sized_sentinel_for = (
         sentinel_for<S, It>                                           &&

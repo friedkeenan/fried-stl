@@ -322,6 +322,7 @@ namespace frd {
             }
     };
 
+    /* 'std::ranges::enable_borrowed_range' is enabled further down. */
     template<range R>
     requires (object<R>)
     class ref_view : public view_interface<ref_view<R>> {
@@ -401,6 +402,7 @@ namespace frd {
         sized,
     };
 
+    /* 'std::ranges::enable_borrowed_range' is enabled further down. */
     template<
         iterator It,
         sentinel_for<It> S = It,
