@@ -57,6 +57,8 @@ static_assert(frd::sign(1) > 0);
 static_assert(std::tuple_size<frd::tuple<int, int>>::value == 2);
 static_assert(frd::same_as<frd::tuple_element<1, frd::tuple<int, int>>, int>);
 
+static_assert(frd::common_range<frd::interval<int>>);
+
 consteval bool fuck() {
     struct S {
         bool value = false;
@@ -95,6 +97,9 @@ int main(int argc, char **argv) {
 
     const auto &[x, y] = fuck;
     std::printf("%d %d\n", x, y);
+
+    static_assert(frd::common_range<decltype(frd::subrange(fuck))>);
+    static_assert(frd::common_range<decltype(frd::subrange(fuck) | frd::views::iterators)>);
 
     for (const auto i : frd::subrange(fuck) | frd::views::iterators) {
         std::printf("%d\n", *i);

@@ -722,9 +722,12 @@ namespace frd {
     /*
         A view over an interval [start, end), similar to Python's 'range'.
 
+        'End' must be semiregular so that the sentinel may also be semiregular.
+
         'std::ranges::enable_borrowed_range' is specialized to 'true' further down.
     */
     template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
+    requires (semiregular<End>)
     class interval : public view_interface<interval<Start, End>> {
         public:
             class iterator {
@@ -735,8 +738,10 @@ namespace frd {
                     Start _value;
 
                     constexpr iterator() = default;
-                    constexpr explicit iterator(const Start &value) noexcept(nothrow_constructible_from<Start, const Start &>)
-                        : _value(value) { }
+
+                    template<forwarder_for<Start> StartFwd>
+                    constexpr explicit iterator(StartFwd &&value) noexcept(nothrow_constructible_from<Start, StartFwd>)
+                        : _value(frd::forward<StartFwd>(value)) { }
 
                     constexpr iterator &operator ++() {
                         this->_value++;
@@ -746,7 +751,7 @@ namespace frd {
 
                     constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++)
 
-                    constexpr iterator &operator --() noexcept requires (weakly_decrementable<Start>) {
+                    constexpr iterator &operator --() requires (weakly_decrementable<Start>) {
                         this->_value--;
 
                         return *this;
@@ -847,7 +852,10 @@ namespace frd {
                     End _value;
 
                     constexpr _sentinel() = default;
-                    constexpr explicit _sentinel(const End &value) noexcept : _value(value) { }
+
+                    template<forwarder_for<End> EndFwd>
+                    constexpr explicit _sentinel(EndFwd &&value) noexcept(nothrow_constructible_from<End, EndFwd>)
+                        : _value(frd::forward<EndFwd>(value)) { }
 
                     constexpr iter_difference<Start> operator -(const iterator &rhs) const
                     requires (
@@ -882,35 +890,74 @@ namespace frd {
             };
 
             /*
-                If 'Start' and 'End' are the same, we can just use 'iterator' as our sentinel.
-                This enables certain iterator operations and certain optimizations for said operations.
+                Use 'iterator' as our sentinel if we can.
+
+                This enables certain iterator operations and certain optimizations for iterator operations.
             */
-            using sentinel = conditional<same_as<Start, End>, iterator, _sentinel>;
+            using sentinel = conditional<
+                same_as<Start, End> && sentinel_for<iterator, iterator>,
+                iterator,
+                _sentinel
+            >;
 
             Start _start;
             End   _end;
 
-            constexpr interval(const Start &start, const End &end) noexcept : _start(start), _end(end) {
+            template<forwarder_for<Start> StartFwd, forwarder_for<End> EndFwd>
+            constexpr interval(StartFwd &&start, EndFwd &&end)
+            noexcept(
+                nothrow_constructible_from<Start, StartFwd> &&
+                nothrow_constructible_from<End,   EndFwd>
+            ) : _start(frd::forward<StartFwd>(start)), _end(frd::forward<EndFwd>(end))
+            {
                 if constexpr (weakly_less_than_comparable_with<const Start &, const End &>) {
                     FRD_ASSERT(start < end, "Interval malformed!");
                 }
             }
 
-            constexpr explicit interval(const End &end) noexcept requires(integral<Start>) : interval(Start{}, end) { }
+            template<forwarder_for<End> EndFwd>
+            requires (integral<Start>)
+            constexpr explicit interval(EndFwd &&end)
+            noexcept(
+                nothrow_constructible_from<End, EndFwd>
+            ) : interval(Start{}, frd::forward<EndFwd>(end)) { }
 
             [[nodiscard]]
-            constexpr iterator begin() const noexcept {
+            constexpr iterator begin() const &
+            noexcept(
+                nothrow_constructible_from<iterator, const Start &>
+            )
+            requires (
+                copyable<Start>
+            ) {
                 return iterator(this->_start);
             }
 
             [[nodiscard]]
-            constexpr sentinel end() const noexcept {
+            constexpr iterator begin() &&
+            noexcept(
+                nothrow_constructible_from<iterator, Start &&>
+            ) {
+                /* To be weakly incrementable, a type must be movable, so no need to check here. */
+
+                return iterator(frd::move(this->_start));
+            }
+
+            [[nodiscard]]
+            constexpr sentinel end() const
+            noexcept(
+                nothrow_constructible_from<sentinel, const End &>
+            ) {
                 return sentinel(this->_end);
             }
     };
 
-    template<integral T>
-    interval(T) -> interval<T, T>;
+    template<typename T>
+    requires (integral<remove_cvref<T>>)
+    interval(T &&) -> interval<decay<T>, decay<T>>;
+
+    template<typename Start, typename End>
+    interval(Start &&, End &&) -> interval<decay<Start>, decay<End>>;
 
     namespace views {
 
