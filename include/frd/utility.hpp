@@ -46,7 +46,11 @@ namespace frd {
     }
 
     template<typename T, typename U>
-    concept _normal_swappable = move_constructible<T> && assignable_from<T &, U &&> && assignable_from<U &, T &&>;
+    concept _normal_swappable = (
+        move_constructible<remove_reference<T>>      &&
+        assignable_from<T &, remove_reference<U> &&> &&
+        assignable_from<U &, remove_reference<T>>
+    );
 
     /*
         A utility function that will use ADL-discovered swap, std::swap,

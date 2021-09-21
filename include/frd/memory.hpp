@@ -376,14 +376,14 @@ namespace frd {
 
             template<typename U>
             requires (implicitly_convertible_to<U *, pointer>)
-            constexpr unique_ptr(unique_ptr<U> &&other) : Base(other.release()) { }
+            constexpr unique_ptr(unique_ptr<U> &&other) noexcept : Base(other.release()) { }
 
             template<typename U>
             requires (implicitly_convertible_to<U *, pointer>)
             constexpr unique_ptr &operator =(unique_ptr<U> &&rhs) noexcept {
                 /* Only check if assigning to self if 'rhs' is of the same type. */
                 if constexpr (same_as<U, T>) {
-                    CHECK_SELF(rhs);
+                    FRD_CHECK_SELF(rhs);
                 }
 
                 if (!this->empty()) {
@@ -432,14 +432,14 @@ namespace frd {
 
             template<typename U>
             requires (implicitly_convertible_to<U (*)[], T(*)[]>)
-            constexpr unique_ptr(unique_ptr<U[]> &&other) : Base(other.release()) { }
+            constexpr unique_ptr(unique_ptr<U[]> &&other) noexcept : Base(other.release()) { }
 
             template<typename U>
             requires (implicitly_convertible_to<U (*)[], T(*)[]>)
             constexpr unique_ptr &operator =(unique_ptr<U[]> &&rhs) noexcept {
                 /* Only check if assigning to self if 'rhs' is of the same type. */
                 if constexpr (same_as<U, T>) {
-                    CHECK_SELF(rhs);
+                    FRD_CHECK_SELF(rhs);
                 }
 
                 if (!this->empty()) {
@@ -483,7 +483,8 @@ namespace frd {
     /*
         ADL-discovered swap.
 
-        Have this outside the class to handle both the primary and array templates.
+        Have this outside the class to handle both the primary and array templates,
+        and because it cannot be put in '_unique_pointer_impl'.
     */
     template<typename T>
     constexpr void swap(unique_ptr<T> &lhs, unique_ptr<T> &rhs) noexcept {
@@ -565,7 +566,7 @@ namespace frd {
             }
 
             constexpr scoped_ptr &operator =(scoped_ptr &&rhs) noexcept(_allocator_traits::propagate_on_container_move_assignment || _allocator_traits::always_equal) {
-                CHECK_SELF(rhs);
+                FRD_CHECK_SELF(rhs);
 
                 if (!this->empty()) {
                     this->_destroy(this->_ptr);

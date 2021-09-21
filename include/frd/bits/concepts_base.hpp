@@ -147,7 +147,7 @@ namespace frd {
     };
 
     template<typename Derived, typename Base>
-    concept derived_from = class_type<Derived> && class_type<Base> && std::convertible_to<const volatile Derived *, const volatile Base *>;
+    concept derived_from = class_type<Derived> && class_type<Base> && convertible_to<const volatile Derived *, const volatile Base *>;
 
     template<typename T>
     concept referenceable = !void_type<T>;

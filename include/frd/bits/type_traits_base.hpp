@@ -359,7 +359,7 @@ namespace frd {
     struct _add_rvalue_reference<T> : type_holder<T> { };
 
     template<typename T>
-    using add_rvalue_reference = typename _add_lvalue_reference<T>::type;
+    using add_rvalue_reference = typename _add_rvalue_reference<T>::type;
 
     template<typename T>
     using add_pointer = remove_reference<T> *;
