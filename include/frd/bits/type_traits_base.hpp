@@ -37,7 +37,7 @@ namespace frd {
     }
 
     template<auto v>
-    using constant_holder = std::integral_constant<decltype(v), v>;
+    struct constant_holder : std::integral_constant<decltype(v), v> { };
 
     using false_holder = constant_holder<false>;
     using true_holder  = constant_holder<true>;

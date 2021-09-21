@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <iterator>
 
 #include <frd/bits/ranges_base.hpp>
 #include <frd/bits/ranges_operations.hpp>
@@ -422,13 +423,14 @@ namespace frd {
             static constexpr bool StoreSize = !sized_sentinel_for<S, It> && Kind == subrange_kind::sized;
 
             struct _data_without_size {
-                It it;
-                S  bound;
+                [[no_unique_address]] It it;
+                [[no_unique_address]] S  bound;
             };
 
             struct _data_with_size {
-                It        it;
-                S         bound;
+                [[no_unique_address]] It it;
+                [[no_unique_address]] S  bound;
+
                 size_type size = 0;
             };
 
@@ -437,7 +439,7 @@ namespace frd {
 
             data _data;
 
-            constexpr subrange() requires (default_constructible<It>) = default;
+            constexpr subrange() requires (default_constructible<It>) : _data(It(), S()) { }
 
             template<convertible_to_non_slicing<It> ItOther>
             constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _data({frd::move(it), bound}) { }
@@ -695,20 +697,21 @@ namespace frd {
             frd::subrange(frd::forward<R>(r));
         };
 
-        constexpr inline range_adaptor_closure all = []<viewable_range R>(R &&r)
-        requires (
-            view<R>          ||
-            _can_ref_view<R> ||
-            _can_subrange<R>
-        ) {
-            if constexpr (view<R>) {
-                return frd::decay_copy(frd::forward<R>(r));
-            } else if constexpr (_can_ref_view<R>) {
-                return frd::ref_view(frd::forward<R>(r));
-            } else {
-                return frd::subrange(frd::forward<R>(r));
-            }
-        };
+        constexpr inline range_adaptor_closure all =
+            []<viewable_range R>(R &&r)
+            requires (
+                view<R>          ||
+                _can_ref_view<R> ||
+                _can_subrange<R>
+            ) {
+                if constexpr (view<R>) {
+                    return frd::decay_copy(frd::forward<R>(r));
+                } else if constexpr (_can_ref_view<R>) {
+                    return frd::ref_view(frd::forward<R>(r));
+                } else {
+                    return frd::subrange(frd::forward<R>(r));
+                }
+            };
 
         template<viewable_range R>
         using all_t = decltype(views::all(frd::declval<R>()));
@@ -719,10 +722,221 @@ namespace frd {
         template<typename R>              \
         cls(R &&) -> cls<views::all_t<R>>
 
+
+    template<bidirectional_iterator It>
+    class reverse_iterator {
+        public:
+            using iterator_concept = conditional<
+                random_access_iterator<It>,
+
+                std::random_access_iterator_tag,
+                std::bidirectional_iterator_tag
+            >;
+
+            using _iterator_category = typename std::iterator_traits<It>::iterator_category;
+
+            using iterator_category = conditional<
+                derived_from<_iterator_category, std::random_access_iterator_tag>,
+
+                std::random_access_iterator_tag,
+                _iterator_category
+            >;
+
+            using value_type      = iter_value<It>;
+            using difference_type = iter_difference<It>;
+            using pointer         = typename std::iterator_traits<It>::pointer;
+            using reference       = iter_reference<It>;
+
+            /*
+                NOTE: The standard stores this as a 'protected' member named 'current'.
+
+                I'm not sure how much I like the name 'current' so I don't use it here,
+                though if it's ever desirable for users to want to inherit from our
+                'reverse_iterator' and access the underlying iterator, then we can rename
+                this member.
+            */
+            It _it;
+
+            constexpr reverse_iterator() : _it() { }
+
+            template<forwarder_for<It> ItFwd>
+            constexpr explicit reverse_iterator(ItFwd &&it) : _it(frd::forward<ItFwd>(it)) { }
+
+            template<typename ItOther>
+            requires (!same_as<ItOther, It> && convertible_to<const ItOther &, It>)
+            constexpr reverse_iterator(const reverse_iterator<ItOther> &other) : _it(other._it) { }
+
+            template<typename ItOther>
+            requires (
+                !same_as<ItOther, It>                  &&
+                convertible_to<const ItOther &, It>    &&
+                assignable_from<It &, const ItOther &>
+            )
+            constexpr reverse_iterator &operator =(const reverse_iterator<ItOther> &rhs)
+            noexcept(
+                nothrow_assignable_from<It &, const ItOther &>
+            ) {
+                this->_it = rhs._it;
+
+                return *this;
+            }
+
+            constexpr It base() const
+            noexcept(
+                nothrow_constructible_from<It, const It &>
+            ) {
+                /*
+                    NOTE: Since all bidirectional iterators are forward iterators and
+                    forward iterators are sentinels for themselves and sentinels must
+                    be copyable¸ 'It' is copyable as well.
+                */
+
+                return this->_it;
+            }
+
+            /* ADL-discovered iter_move. */
+            friend constexpr iter_rvalue_reference<It> iter_move(const reverse_iterator &it)
+            noexcept(
+                nothrow_constructible_from<It, const It &>       &&
+                noexcept(frd::iter_move(--frd::declval<It &>()))
+            ) {
+                auto underlying_it = it.base();
+
+                return frd::iter_move(--underlying_it);
+            }
+
+            /* ADL-discovered iter_swap. */
+            template<typename ItOther>
+            friend constexpr void iter_swap(const reverse_iterator &lhs, const reverse_iterator<ItOther> &rhs)
+            noexcept(
+                nothrow_constructible_from<It, const It &>                                &&
+                nothrow_constructible_from<ItOther, const ItOther &>                      &&
+                noexcept(frd::iter_swap(--frd::declval<It &>(), --frd::declval<ItOther &>()))
+            ) {
+                auto underlying_lhs = lhs.base();
+                auto underlying_rhs = rhs.base();
+
+                frd::iter_swap(--underlying_lhs, --underlying_rhs);
+            }
+
+            constexpr reverse_iterator &operator ++() {
+                this->_it--;
+
+                return *this;
+            }
+
+            constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(reverse_iterator, ++)
+
+            constexpr reverse_iterator &operator --() {
+                this->_it++;
+
+                return *this;
+            }
+
+            constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(reverse_iterator, --)
+
+            constexpr reverse_iterator operator +(const difference_type delta) const
+            requires (
+                random_access_iterator<It>
+            ) {
+                return reverse_iterator(this->_it - delta);
+            }
+
+            /* Commutative addition. */
+            friend constexpr reverse_iterator operator +(const difference_type delta, const reverse_iterator &it)
+            requires (
+                random_access_iterator<It>
+            ) {
+                return it + delta;
+            }
+
+            constexpr reverse_iterator operator -(const difference_type delta) const
+            requires (
+                random_access_iterator<It>
+            ) {
+                return reverse_iterator(this->_it + delta);
+            }
+
+            template<typename ItOther>
+            constexpr auto operator -(const reverse_iterator<ItOther> &rhs) const {
+                return this->_it - rhs._it;
+            }
+
+            constexpr reverse_iterator &operator +=(const difference_type delta) const
+            requires (
+                random_access_iterator<It>
+            ) {
+                this->_it -= delta;
+
+                return *this;
+            }
+
+            constexpr reverse_iterator &operator -=(const difference_type delta) const
+            requires (
+                random_access_iterator<It>
+            ) {
+                this->_it += delta;
+
+                return *this;
+            }
+
+            constexpr reference operator *() const {
+                return *frd::prev(this->_it);
+            }
+
+            constexpr pointer operator ->() const noexcept
+            requires (
+                convertible_to_address<It>
+            ) {
+                return frd::to_address(frd::prev(this->_it));
+            }
+
+            constexpr reference operator [](const difference_type delta) const
+            noexcept(
+                nothrow_constructible_from<reference, reference>
+            )
+            requires (
+                random_access_iterator<It>
+            ) {
+                return this->_it[-delta - 1];
+            }
+
+            /*
+                NOTE: The standard says to forwward each individual comparison operator
+                onto the 'base()' iterators if the expression is well-formed.
+
+                I do not hate my code so much as to do all that, so we provide the spaceship
+                operator instead.
+            */
+            template<typename ItOther>
+            requires (synthetic_three_way_comparable_with<const It &, const ItOther &>)
+            constexpr auto operator <=>(const reverse_iterator<ItOther> &rhs) const
+            noexcept(
+                nothrow_synthetic_three_way_comparable_with<const It &, const ItOther &>
+            ) {
+                return frd::synthetic_three_way_compare(this->_it, rhs._it);
+            }
+
+            template<weakly_equality_comparable_with<It> ItOther>
+            constexpr bool operator ==(const reverse_iterator<ItOther> &rhs) const
+            noexcept(
+                noexcept(static_cast<bool>(this->_it == rhs._it))
+            ) {
+                return static_cast<bool>(this->_it == rhs._it);
+            }
+    };
+
+    template<typename It>
+    reverse_iterator(It &&) -> reverse_iterator<decay<It>>;
+
     /*
         A view over an interval [start, end), similar to Python's 'range'.
 
         'End' must be semiregular so that the sentinel may also be semiregular.
+
+        Could potentially implement 'iota_view' and have 'interval' inherit from that,
+        but unless we need an infinitely incrementing range (could end up being useful
+        for an 'enumerate' view), I would rather not.
 
         'std::ranges::enable_borrowed_range' is specialized to 'true' further down.
     */
@@ -734,6 +948,8 @@ namespace frd {
                 public:
                     using value_type      = Start;
                     using difference_type = iter_difference<Start>;
+                    using reference       = Start;
+                    using const_reference = const Start;
 
                     Start _value;
 
@@ -896,12 +1112,13 @@ namespace frd {
             */
             using sentinel = conditional<
                 same_as<Start, End> && sentinel_for<iterator, iterator>,
+
                 iterator,
                 _sentinel
             >;
 
-            Start _start;
-            End   _end;
+            [[no_unique_address]] Start _start;
+            [[no_unique_address]] End   _end;
 
             template<forwarder_for<Start> StartFwd, forwarder_for<End> EndFwd>
             constexpr interval(StartFwd &&start, EndFwd &&end)
@@ -971,14 +1188,12 @@ namespace frd {
 
             'all_t<R>' must be a borrowed range because 'interval' doesn't store a range.
         */
-        constexpr inline range_adaptor_closure iterators = []<viewable_range R>(R &&r)
-        requires (
-            borrowed_range<all_t<R>>
-        ) {
-            auto all_rng = views::all(frd::forward<R>(r));
+        constexpr inline range_adaptor_closure iterators =
+            []<viewable_range R>(R &&r) requires (borrowed_range<all_t<R>>) {
+                auto all_rng = views::all(frd::forward<R>(r));
 
-            return interval(frd::begin(all_rng), frd::end(all_rng));
-        };
+                return interval(frd::begin(all_rng), frd::end(all_rng));
+            };
 
     }
 
@@ -987,15 +1202,22 @@ namespace frd {
 }
 
 /* Templated variable specializations must be in the proper namespace. */
-namespace std::ranges {
+namespace std {
 
-    template<typename R>
-    constexpr inline bool enable_borrowed_range<frd::ref_view<R>> = true;
+    namespace ranges {
 
-    template<typename It, typename S, frd::subrange_kind Kind>
-    constexpr inline bool enable_borrowed_range<frd::subrange<It, S, Kind>> = true;
+        template<typename R>
+        constexpr inline bool enable_borrowed_range<frd::ref_view<R>> = true;
 
-    template<typename Start, typename End>
-    constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
+        template<typename It, typename S, frd::subrange_kind Kind>
+        constexpr inline bool enable_borrowed_range<frd::subrange<It, S, Kind>> = true;
+
+        template<typename Start, typename End>
+        constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
+
+    }
+
+    template<typename It>
+    constexpr inline bool disable_sized_sentinel_for<frd::reverse_iterator<It>, frd::reverse_iterator<It>> = disable_sized_sentinel_for<It, It>;
 
 }

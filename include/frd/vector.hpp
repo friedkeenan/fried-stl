@@ -327,11 +327,15 @@ namespace frd {
             /* TODO: Do we want 'at'? I'm not really a fan of it. */
             [[nodiscard]]
             constexpr reference operator [](size_type index) noexcept {
+                FRD_ASSERT(index < this->size());
+
                 return this->_data[index];
             }
 
             [[nodiscard]]
             constexpr const_reference operator [](size_type index) const noexcept {
+                FRD_ASSERT(index < this->size());
+
                 return this->_data[index];
             }
     };

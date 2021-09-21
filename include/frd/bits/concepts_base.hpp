@@ -172,6 +172,11 @@ namespace frd {
         }
     );
 
+    template<typename LHS, typename RHS>
+    concept nothrow_assignable_from = assignable_from<LHS, RHS> && requires(LHS lhs, RHS &&rhs) {
+        requires noexcept(lhs = frd::forward<RHS>(rhs));
+    };
+
     template<typename T>
     concept destructible =
         !(

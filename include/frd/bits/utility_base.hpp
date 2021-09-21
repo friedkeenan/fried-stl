@@ -42,17 +42,12 @@ namespace frd {
     }
 
     [[noreturn]]
-    inline void unreachable() {
+    inline void unreachable(const char *msg = nullptr) {
+        FRD_UNUSED(msg);
+
         /* Here we can have different implementations for unreachable code. */
 
         __builtin_unreachable();
-    }
-
-    [[noreturn]]
-    inline void unreachable(const char *msg) {
-        FRD_UNUSED(msg);
-
-        frd::unreachable();
     }
 
 }

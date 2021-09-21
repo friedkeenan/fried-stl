@@ -314,6 +314,11 @@ namespace frd {
         }
     }
 
+    template<typename Ptr>
+    concept convertible_to_address = requires (const Ptr &ptr) {
+        ::frd::to_address(ptr);
+    };
+
     template<typename Element>
     class _unique_ptr_impl {
         /* A common base class for primary and array overloads of unique_ptr. */
@@ -475,6 +480,11 @@ namespace frd {
             }
     };
 
+    /*
+        ADL-discovered swap.
+
+        Have this outside the class to handle both the primary and array templates.
+    */
     template<typename T>
     constexpr void swap(unique_ptr<T> &lhs, unique_ptr<T> &rhs) noexcept {
         lhs.swap(rhs);
@@ -642,6 +652,11 @@ namespace frd {
                 }
             }
 
+            /* ADL-discovered swap. */
+            friend constexpr void swap(scoped_ptr &lhs, scoped_ptr &rhs) noexcept(noexcept(lhs.swap(rhs))) {
+                lhs.swap(rhs);
+            }
+
             [[nodiscard]]
             constexpr Allocator get_allocator() const noexcept {
                 return this->_allocator;
@@ -656,11 +671,6 @@ namespace frd {
                 return this->_ptr;
             }
     };
-
-    template<typename T, typename Allocator>
-    constexpr void swap(scoped_ptr<T, Allocator> &lhs, scoped_ptr<T, Allocator> &rhs) noexcept(noexcept(lhs.swap(rhs))) {
-        lhs.swap(rhs);
-    }
 
     template<typename T, typename Allocator, typename... Args>
     requires (constructible_from<T, Args...>)

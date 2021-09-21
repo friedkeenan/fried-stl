@@ -37,6 +37,11 @@ namespace frd {
                 }
             }
 
+            /* ADL-discovered swap. */
+            friend constexpr void swap(array &lhs, array &rhs) noexcept(nothrow_swappable<Element>) {
+                lhs.swap(rhs);
+            }
+
             constexpr reference front() noexcept {
                 return this->_elems[0];
             }
@@ -98,21 +103,35 @@ namespace frd {
             }
 
             constexpr reference operator [](const size_type index) noexcept {
+                FRD_ASSERT(index < Size);
+
                 return this->_elems[index];
             }
 
             constexpr const_reference operator [](const size_type index) const noexcept {
+                FRD_ASSERT(index < Size);
+
                 return this->_elems[index];
             }
 
             template<size_type I>
-            constexpr reference get() noexcept {
+            constexpr reference get() & noexcept {
                 return this->_elems[I];
             }
 
             template<size_type I>
-            constexpr const_reference get() const noexcept {
+            constexpr const_reference get() const & noexcept {
                 return this->_elems[I];
+            }
+
+            template<size_type I>
+            constexpr Element &&get() && noexcept {
+                return frd::move(this->_elems[I]);
+            }
+
+            template<size_type I>
+            constexpr Element &&get() const && noexcept {
+                return frd::move(this->_elems[I]);
             }
 
             constexpr auto operator <=>(const array &rhs) const
@@ -147,11 +166,6 @@ namespace frd {
 
     template<frd::size_t I, typename T, frd::size_t N>
     struct tuple_element_holder<I, array<T, N>> : type_holder<T> { };
-
-    template<typename T, frd::size_t N>
-    void swap(array<T, N> &lhs, array<T, N> &rhs) noexcept(noexcept(lhs.swap(rhs))) {
-        lhs.swap(rhs);
-    }
 
     template<typename T, frd::size_t N, frd::size_t... I>
     constexpr array<remove_cv<T>, N> _to_array(const T (&arr)[N], index_sequence<I...>) {

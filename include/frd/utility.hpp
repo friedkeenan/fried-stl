@@ -22,10 +22,9 @@ namespace frd {
     [[nodiscard]]
     constexpr T exchange(T &obj, U &&new_value)
     noexcept(
-        nothrow_constructible_from<T, T &&>             &&
-        noexcept(obj = frd::forward<U>(new_value)) &&
-        nothrow_constructible_from<T, T>
-    ){
+        nothrow_constructible_from<T, T &&> &&
+        nothrow_assignable_from<T &, U>
+    ) {
         T old_value = frd::move(obj);
 
         obj = frd::forward<U>(new_value);
@@ -33,20 +32,15 @@ namespace frd {
         return old_value;
     }
 
-    template<typename T, typename U>
-    concept _std_swappable = requires(T &&t, U &&u) {
-        std::swap(frd::forward<T>(t), frd::forward<U>(u));
-    };
-
     namespace _adl {
 
-        /* Lookup for '_adl_swap'. */
+        /* Lookups for '_adl_swap'. */
         template<typename T>
         void swap(T &, T &) = delete;
 
         template<typename T, typename U>
-        concept _adl_swap = adl_discoverable<T> && requires(T &&t, U &&u) {
-            swap(frd::forward<T>, frd::forward<U>);
+        concept _adl_swap = requires(T &&t, U &&u) {
+            swap(frd::forward<T>(t), frd::forward<U>(u));
         };
 
     }
@@ -64,22 +58,18 @@ namespace frd {
     /* Needs to be a callable object for ADL lookup to be checked. */
     struct _swap_fn {
         template<typename LHS, typename RHS>
-        requires (_std_swappable<LHS, RHS> || _adl::_adl_swap<LHS, RHS> || _normal_swappable<LHS, RHS>)
+        requires (_adl::_adl_swap<LHS, RHS> || _normal_swappable<LHS, RHS>)
         constexpr void operator ()(LHS &&lhs, RHS &&rhs) const
         noexcept(
             []() {
-                if constexpr (_std_swappable<LHS, RHS>) {
-                    return noexcept(std::swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs)));
-                } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
+                if constexpr (_adl::_adl_swap<LHS, RHS>) {
                     return noexcept(swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs)));
                 } else {
                     return noexcept(rhs = frd::exchange(lhs, frd::move(rhs)));
                 }
             }()
         ) {
-            if constexpr (_std_swappable<LHS, RHS>) {
-                std::swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
-            } else if constexpr (_adl::_adl_swap<LHS, RHS>) {
+            if constexpr (_adl::_adl_swap<LHS, RHS>) {
                 swap(frd::forward<LHS>(lhs), frd::forward<RHS>(rhs));
             } else {
                 rhs = frd::exchange(lhs, frd::move(rhs));
@@ -96,7 +86,7 @@ namespace frd {
 
     template<typename T, typename U>
     concept swappable_with = requires(T &t, U &u) {
-        swap(t, u);
+        ::frd::swap(t, u);
     };
 
     template<typename T>
@@ -104,7 +94,7 @@ namespace frd {
 
     template<typename T, typename U>
     concept nothrow_swappable_with = swappable_with<T, U> && requires(T &t, U &u) {
-        requires noexcept(swap(t, u));
+        requires noexcept(frd::swap(t, u));
     };
 
     template<typename T>

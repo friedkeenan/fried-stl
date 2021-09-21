@@ -10,11 +10,6 @@
 
 namespace frd {
 
-    template<typename It>
-    concept _star_dereferenceable = requires(It &it) {
-        { *it } -> referenceable;
-    };
-
     namespace _adl {
 
         /* Lookups for '_adl_iter_move'. */
@@ -83,6 +78,11 @@ namespace frd {
 
     template<typename It>
     using iter_value = detected_else<typename std::indirectly_readable_traits<remove_cvref<It>>::value_type, _iter_value, It>;
+
+    template<typename It>
+    concept _star_dereferenceable = requires(It &it) {
+        { *it } -> referenceable;
+    };
 
     template<_star_dereferenceable It>
     using iter_reference = decltype(*frd::declval<It &>());
@@ -165,6 +165,92 @@ namespace frd {
         const_cast<const iter_reference<Out> &&>(*frd::forward<Out>(out)) = frd::forward<Value>(value);
     };
 
+    template<typename In, typename Out>
+    concept indirectly_movable = indirectly_readable<In> && indirectly_writable<Out, iter_rvalue_reference<In>>;
+
+    template<typename In, typename Out>
+    concept indirectly_movable_storable = (
+        indirectly_movable<In, Out>                                   &&
+        indirectly_writable<Out, iter_value<In>>                      &&
+        movable<iter_value<In>>                                       &&
+        constructible_from<iter_value<In>, iter_rvalue_reference<In>> &&
+        assignable_from<iter_value<In>, iter_rvalue_reference<In>>
+    );
+
+    template<typename ItT, typename ItU = ItT>
+    constexpr iter_value<ItT> iter_exchange_move(ItT &&it_t, ItU &&it_u)
+    noexcept(
+        nothrow_constructible_from<iter_value<ItT>, decltype(frd::iter_move(frd::forward<ItT>(it_t)))> &&
+        noexcept(*it_t = frd::iter_move(frd::forward<ItU>(it_u)))
+    ) {
+        iter_value<ItT> old_value = frd::iter_move(frd::forward<ItT>(it_t));
+
+        *it_t = frd::iter_move(frd::forward<ItU>(it_u));
+
+        return old_value;
+    }
+
+    namespace _adl {
+
+        /* Lookups for '_adl_iter_swap'. */
+        void iter_swap(auto, auto) = delete;
+
+        template<typename ItT, typename ItU>
+        concept _adl_iter_swap = (
+            (adl_discoverable<ItT> || adl_discoverable<ItU>) &&
+            requires(ItT &&it_t, ItU &&it_u) {
+                iter_swap(frd::forward<ItT>(it_t), frd::forward<ItU>(it_u));
+            }
+        );
+
+    }
+
+    template<typename ItT, typename ItU>
+    concept _swap_deref_iter_swap = (
+        indirectly_readable<ItT> &&
+        indirectly_readable<ItU> &&
+        swappable_with<
+            iter_reference<ItT>,
+            iter_reference<ItU>
+        >
+    );
+
+    template<typename ItT, typename ItU>
+    concept _exchange_iter_swap = indirectly_movable_storable<ItT, ItU> && indirectly_movable_storable<ItU, ItT>;
+
+    /* Needs to be a callable object for ADL lookup to be checked. */
+    struct _iter_swap_fn {
+        template<typename ItT, typename ItU>
+        requires (_adl::_adl_iter_swap<ItT, ItU> || _swap_deref_iter_swap<ItT, ItU> || _exchange_iter_swap<ItT, ItU>)
+        constexpr void operator ()(ItT &&it_t, ItU &&it_u) const
+        noexcept(
+            []() {
+                if constexpr (_adl::_adl_iter_swap<ItT, ItU>) {
+                    return noexcept(iter_swap(frd::forward<ItT>(it_t), frd::forward<ItU>(it_u)));
+                } else if constexpr (_swap_deref_iter_swap<ItT, ItU>) {
+                    return noexcept(frd::swap(*frd::forward<ItT>(it_t), *frd::forward<ItU>(it_u)));
+                } else {
+                    return noexcept(frd::iter_exchange_move(frd::forward<ItT>(it_t), frd::forward<ItU>(it_u)));
+                }
+            }()
+        ) {
+            if constexpr (_adl::_adl_iter_swap<ItT, ItU>) {
+                iter_swap(frd::forward<ItT>(it_t), frd::forward<ItU>(it_u));
+            } else if constexpr (_swap_deref_iter_swap<ItT, ItU>) {
+                frd::swap(*frd::forward<ItT>(it_t), *frd::forward<ItU>(it_u));
+            } else {
+                *frd::forward<ItT>(it_t) = frd::iter_exchange_move(frd::forward<ItU>(it_u), frd::forward<ItT>(it_t));
+            }
+        }
+    };
+
+    /* Needs to be in own namespace to avoid ADL conflicts. */
+    namespace {
+
+        constexpr inline _iter_swap_fn iter_swap;
+
+    }
+
     /* Equivalent to 'std::input_or_output_iterator'. */
     template<typename It>
     concept iterator = requires(It it) {
@@ -210,6 +296,17 @@ namespace frd {
         I'm not sure I could even make an equivalent to 'ITER_CONCEPT' without relying
         on implementation details of the STL since it requires knowing if
         'std::iterator_traits<It>' uses the primary template or not.
+
+        Upon further reflection, I believe the standard may do that so that types
+        can restrict what type of iterator they're seen as while still allowing
+        users to not specify their iterator concept, which will lead to it being
+        given 'std::random_access_iterator_tag', which is derived from each level
+        of input iterator tags besides 'std::contiguous_iterator_tag', all while not
+        changing the legacy named concepts for iterators. I do not find it compelling
+        for classes to disable being seen as specific types of iterators, and so I
+        will continue to not check their tags.
+
+        Not checking tags DOES cause issues with 'contiguous_iterator', I NEED to fix them.
     */
 
     template<typename It>
@@ -238,6 +335,19 @@ namespace frd {
             { const_it[delta] } -> same_as<iter_reference<It>>;
         };
 
+    /*
+        NOTE: The standard seemingly requires iterators to
+        opt-in to being contiguous iterators, but we do not.
+
+        This seems like it could run into issues with an iterator that
+        satisfies 'random_access_iterator', returns an lvalue reference
+        when dereferenced, has its value type be the same as its reference
+        type removed of all its qualifiers, and importantly, can be used
+        with 'frd::to_address' by defining 'operator ->', which would
+        culminate in being labeled a contiguous iterator when it isn't.
+
+        TODO: Fix this as this is a very big problem.
+    */
     template<typename It>
     concept contiguous_iterator = (
         random_access_iterator<It>                                &&
@@ -587,7 +697,7 @@ namespace frd {
         needed to know when they're at the end of their range.
     */
     struct default_sentinel_t { };
-    constexpr inline default_sentinel_t default_sentinel;
+    constexpr inline default_sentinel_t default_sentinel{};
 
 }
 

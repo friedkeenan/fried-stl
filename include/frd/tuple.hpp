@@ -146,9 +146,8 @@ namespace frd {
 
             /* TODO: 'swap' method. */
 
-            /* TODO: Make sure we don't need lvalue/rvalue overloads. */
             template<frd::size_t I>
-            constexpr decltype(auto) get() noexcept {
+            constexpr decltype(auto) get() & noexcept {
                 if constexpr (I == 0) {
                     return this->_head;
                 } else {
@@ -157,11 +156,29 @@ namespace frd {
             }
 
             template<frd::size_t I>
-            constexpr decltype(auto) get() const noexcept {
+            constexpr decltype(auto) get() const & noexcept {
                 if constexpr (I == 0) {
                     return this->_head;
                 } else {
                     return this->_tail.template get<I - 1>();
+                }
+            }
+
+            template<frd::size_t I>
+            constexpr decltype(auto) get() && noexcept {
+                if constexpr (I == 0) {
+                    return frd::move(this->_head);
+                } else {
+                    return frd::move(this->_tail.template get<I - 1>());
+                }
+            }
+
+            template<frd::size_t I>
+            constexpr decltype(auto) get() const && noexcept {
+                if constexpr (I == 0) {
+                    return frd::move(this->_head);
+                } else {
+                    return frd::move(this->_tail.template get<I - 1>());
                 }
             }
 

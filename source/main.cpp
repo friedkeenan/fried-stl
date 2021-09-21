@@ -59,6 +59,12 @@ static_assert(frd::same_as<frd::tuple_element<1, frd::tuple<int, int>>, int>);
 
 static_assert(frd::common_range<frd::interval<int>>);
 
+static_assert(frd::_adl::_adl_swap<frd::unique_ptr<int> &, frd::unique_ptr<int> &>);
+static_assert(frd::nothrow_swappable<frd::unique_ptr<int> &>);
+
+/* TODO: THIS SHOULD NOT HAPPEN THIS IS BROKEN CODE. */
+static_assert(frd::contiguous_iterator<frd::reverse_iterator<int *>>);
+
 consteval bool fuck() {
     struct S {
         bool value = false;
@@ -91,7 +97,7 @@ static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 int main(int argc, char **argv) {
     FRD_UNUSED(argc, argv);
 
-    const auto fuck = frd::array{1, 2};
+    constexpr auto fuck = frd::array{1, 2};
 
     std::printf("%d\n", frd::get<1>(fuck));
 
@@ -101,7 +107,9 @@ int main(int argc, char **argv) {
     static_assert(frd::common_range<decltype(frd::subrange(fuck))>);
     static_assert(frd::common_range<decltype(frd::subrange(fuck) | frd::views::iterators)>);
 
-    for (const auto i : frd::subrange(fuck) | frd::views::iterators) {
+    static_assert(frd::reverse_iterator(fuck.end())[0] == 2);
+
+    for (auto i = frd::reverse_iterator(fuck.end()); i != frd::reverse_iterator(fuck.begin()); i++) {
         std::printf("%d\n", *i);
     }
 
