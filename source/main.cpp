@@ -62,8 +62,7 @@ static_assert(frd::common_range<frd::interval<int>>);
 static_assert(frd::_adl::_adl_swap<frd::unique_ptr<int> &, frd::unique_ptr<int> &>);
 static_assert(frd::nothrow_swappable<frd::unique_ptr<int> &>);
 
-/* TODO: THIS SHOULD NOT HAPPEN THIS IS BROKEN CODE. */
-static_assert(frd::contiguous_iterator<frd::reverse_iterator<int *>>);
+static_assert(!frd::contiguous_iterator<frd::reverse_iterator<int *>>);
 
 consteval bool fuck() {
     struct S {

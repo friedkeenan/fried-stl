@@ -949,7 +949,6 @@ namespace frd {
                     using value_type      = Start;
                     using difference_type = iter_difference<Start>;
                     using reference       = Start;
-                    using const_reference = const Start;
 
                     Start _value;
 
@@ -1031,6 +1030,10 @@ namespace frd {
 
                     constexpr Start operator *() const noexcept(nothrow_constructible_from<Start, const Start &>) {
                         return this->_value;
+                    }
+
+                    constexpr const Start *operator ->() const noexcept {
+                        return std::addressof(this->_value);
                     }
 
                     constexpr Start operator [](const difference_type delta) const

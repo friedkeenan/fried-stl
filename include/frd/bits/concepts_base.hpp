@@ -150,7 +150,9 @@ namespace frd {
     concept derived_from = class_type<Derived> && class_type<Base> && convertible_to<const volatile Derived *, const volatile Base *>;
 
     template<typename T>
-    concept referenceable = !void_type<T>;
+    concept referenceable = requires {
+        typename type_holder<T &>;
+    };
 
     /* I do not implement 'std::common_reference_t' because it does not seem fun to do so. */
     template<typename T, typename U>
