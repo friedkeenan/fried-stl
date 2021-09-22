@@ -522,8 +522,12 @@ namespace frd {
 
     /*
         We get the associated "iterator concept" of an iterator by seeing if
-        'iterator_traits<I>' is from the primary template, and if so we just
+        'iterator_traits<It>' is from the primary template, and if so we just
         use 'It' as an effective 'iterator_traits', otherwise we use the template.
+        We then try to get 'traits::iterator_concept', or, failing that, we try to
+        get 'traits::iterator_category'. If we can't do that either, then if
+        'iterator_traits<It>' is generated from the primary template, we default to
+        'std::random_access_iterator_tag', else 'void'.
 
         This is necessary for the iterator concepts so we can make 'contiguous_iterator'
         opt-in; If we only check iterator operations, many random access iterators, e.g.
@@ -540,6 +544,25 @@ namespace frd {
 
         If I were to design this API myself I'd probably just make some
         'enable_contiguous_iterator' template and call it a day.
+
+        NOTE: Our implementation is *slightly* different from the standard's as we only
+        check if each value in 'iterator_traits<It>' is the same as the one generated
+        from the primary template. This can lead to situations where 'iterator_traits<It>'
+        has all the same values as the primary template, but does not define 'iterator_concept'
+        or 'iterator_category', leading to 'iter_concept<It>' spitting out
+        'std::random_access_iterator_tag', when the standard would use
+        'iterator_traits<It>::iterator_category'. However, this deviance from the standard should
+        only impact iterators opting out of being counted as e.g. a random access iterator,
+        which as stated previously I do not find that use case compelling, and it's a small
+        portion of said iterators as well. This does not lead to iterators being incorrectly
+        marked as contiguous iterators, which is the main important thing for me.
+
+        This issue also should not functionally affect 'iter_value' or 'iter_difference'.
+
+        I *really* wish the standard just included some flag to say whether 'std::iterator_traits<It>'
+        is from the primary template, or gave some API for us to test that ourselves.
+
+        Alas, woe is me, woe is me.
     */
 
     template<typename It>
