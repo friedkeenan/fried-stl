@@ -941,7 +941,7 @@ namespace frd {
             /* Don't define 'const_iterator' as we're not sure 'const V' is a range. */
             using iterator = reverse_iterator<range_iterator<V>>;
 
-            static constexpr bool StoreCachedBegin = !(
+            static constexpr bool StoreCachedCommonEnd = !(
                 common_range<V> &&
 
                 /*
@@ -957,20 +957,20 @@ namespace frd {
                 )
             );
 
-            struct _data_without_cached_begin {
+            struct _data_without_cached_common_end {
                 [[no_unique_address]] V base = V();
             };
 
-            struct _data_with_cached_begin {
+            struct _data_with_cached_common_end {
                 [[no_unique_address]] V base = V();
 
-                cached_iterator<V> cached_begin = {};
+                cached_iterator<V> cached_common_end = {};
 
                 template<forwarder_for<V> VFwd>
-                constexpr _data_with_cached_begin(VFwd &&base) : base(frd::forward<VFwd>(base)) { }
+                constexpr _data_with_cached_common_end(VFwd &&base) : base(frd::forward<VFwd>(base)) { }
             };
 
-            using data = conditional<StoreCachedBegin, _data_with_cached_begin, _data_without_cached_begin>;
+            using data = conditional<StoreCachedCommonEnd, _data_with_cached_common_end, _data_without_cached_common_end>;
 
             [[no_unique_address]] data _data;
 
@@ -1010,18 +1010,18 @@ namespace frd {
             ) {
                 if constexpr (common_range<V>) {
                     return reverse_iterator(frd::end(this->_data.base));
-                } else if constexpr (StoreCachedBegin) {
-                    if (this->_data.cached_begin.has_value()) {
-                        return reverse_iterator(this->_data.cached_begin.get(this->_data.base));
+                } else if constexpr (StoreCachedCommonEnd) {
+                    if (this->_data.cached_common_end.has_value()) {
+                        return reverse_iterator(this->_data.cached_common_end.get(this->_data.base));
                     }
 
-                    const auto common_end = frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
+                    auto common_end = frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
 
-                    this->_data.cached_begin.set(this->_data.base, common_end);
+                    this->_data.cached_common_end.set(this->_data.base, common_end);
 
-                    return common_end;
+                    return reverse_iterator(frd::move(common_end));
                 } else {
-                    return frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
+                    return reverse_iterator(frd::next(frd::begin(this->_data.base), frd::end(this->_data.base)));
                 }
             }
 
@@ -1038,13 +1038,15 @@ namespace frd {
             constexpr iterator end()
             noexcept(
                 noexcept(reverse_iterator(frd::begin(this->_data.base)))
-            )
-            requires (
-                common_range<V>
             ) {
                 return reverse_iterator(frd::begin(this->_data.base));
             }
 
+            /*
+                NOTE: The standard says this requires 'common_range<const V>',
+                but technically it's fine even if that's not true. I believe
+                it requires a common range for parity with the 'begin' method.
+            */
             constexpr auto end() const
             noexcept(
                 noexcept(reverse_iterator(frd::begin(this->_data.base)))

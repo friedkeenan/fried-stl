@@ -99,8 +99,10 @@ namespace frd {
         }
 
         template<forwarder_for<R> RFwd>
-        constexpr _iterator get() const {
+        constexpr _iterator get(RFwd &&r) const {
             FRD_ASSERT(this->has_value(), "cached_iterator doesn't have a value!");
+
+            FRD_UNUSED(r);
 
             return this->_it_holder.it;
         }
@@ -111,8 +113,8 @@ namespace frd {
 
             FRD_UNUSED(r);
 
-            this->_it_holder   = frd::forward<ItFwd>(it);
-            this->_initialized = true;
+            this->_it_holder.it = frd::forward<ItFwd>(it);
+            this->_initialized  = true;
         }
     };
 

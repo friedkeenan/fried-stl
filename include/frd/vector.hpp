@@ -62,6 +62,12 @@ namespace frd {
                 this->_free_data();
             }
 
+            constexpr iterator _to_mutable_iterator(const const_iterator it) {
+                const auto begin = this->begin();
+
+                return (begin + (it - begin));
+            }
+
             /* Malformed if 'new_capacity' is less than current size. */
             constexpr void _reserve_impl(const size_type new_capacity) {
                 /* TODO: Decide whether we should check against 'max_size'. */
@@ -157,10 +163,9 @@ namespace frd {
                     /*
                         Loop starting from the end so we can just move each element over one
                         without overwriting any other element.
-
-                        TODO: Reverse interval over these iterators would be preferable.
                     */
-                    for (auto elem_it = this->end() - 1; elem_it != pos - 1; elem_it--) {
+                    const auto mutable_pos = this->_to_mutable_iterator(pos);
+                    for (const auto elem_it : frd::interval(mutable_pos, this->end()) | views::reverse) {
                         const auto elem_addr = pointer{elem_it};
 
                         _allocator_traits::construct(this->_allocator, elem_addr + 1, frd::move(*elem_it));
