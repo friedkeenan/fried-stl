@@ -94,11 +94,19 @@ static_assert(fuck());
 
 static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 
+struct IntSentinel {
+    constexpr bool operator ==(const int rhs) const noexcept {
+        return rhs == 5;
+    }
+};
+
+static_assert(frd::subrange(frd::interval(0, IntSentinel{}), 5).size() == 5);
+
 consteval bool shit() {
     bool success = true;
 
     int compare = 4;
-    for (const auto i : frd::interval(5) | frd::views::reverse | frd::views::iterators) {
+    for (const auto i : frd::interval(0, IntSentinel{}) | frd::views::reverse | frd::views::iterators) {
         success = (success && (*i == compare));
 
         compare--;

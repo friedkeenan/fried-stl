@@ -423,43 +423,25 @@ namespace frd {
 
             static constexpr bool StoreSize = !sized_sentinel_for<S, It> && Kind == subrange_kind::sized;
 
-            struct _data_without_size {
-                [[no_unique_address]] It it;
-                [[no_unique_address]] S  bound;
-            };
+            [[no_unique_address]] It _it;
+            [[no_unique_address]] S  _bound;
 
-            struct _data_with_size {
-                [[no_unique_address]] It it;
-                [[no_unique_address]] S  bound;
+            [[no_unique_address]] maybe_present<StoreSize, size_type> _size = {};
 
-                size_type size = 0;
-
-                constexpr _data_with_size() = default;
-
-                template<forwarder_for<It> ItFwd, forwarder_for<S> SFwd>
-                constexpr _data_with_size(ItFwd &&it, SFwd &&bound, const size_type size = 0)
-                    : it(frd::forward<ItFwd>(it)), bound(frd::forward<SFwd>(bound)), size(size) { }
-            };
-
-            /* Only store the size if we need to. */
-            using data = conditional<StoreSize, _data_with_size, _data_without_size>;
-
-            [[no_unique_address]] data _data;
-
-            constexpr subrange() requires (default_constructible<It>) : _data(It(), S()) { }
+            constexpr subrange() requires (default_constructible<It>) : _it(It()), _bound(S()) { }
 
             template<convertible_to_non_slicing<It> ItOther>
-            constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _data(frd::move(it), bound) { }
+            constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _it(frd::move(it)), _bound(bound) { }
 
             template<convertible_to_non_slicing<It> ItOther>
             requires (Kind == subrange_kind::sized && !StoreSize)
-            constexpr subrange(ItOther it, S bound, const size_type size) : _data(frd::move(it), bound) {
+            constexpr subrange(ItOther it, S bound, const size_type size) : _it(frd::move(it)), _bound(bound) {
                 FRD_UNUSED(size);
             }
 
             template<convertible_to_non_slicing<It> ItOther>
             requires (Kind == subrange_kind::sized && StoreSize)
-            constexpr subrange(ItOther it, S bound, const size_type size) : _data(frd::move(it), bound, size) { }
+            constexpr subrange(ItOther it, S bound, const size_type size) : _it(frd::move(it)), _bound(bound), _size(size) { }
 
             template<borrowed_range R>
             requires (
@@ -491,9 +473,9 @@ namespace frd {
 
             constexpr bool empty() const
             noexcept(
-                noexcept(static_cast<bool>(this->_data.it == this->_data.bound))
+                noexcept(static_cast<bool>(this->_it == this->_bound))
             ) {
-                return static_cast<bool>(this->_data.it == this->_data.bound);
+                return static_cast<bool>(this->_it == this->_bound);
             }
 
             constexpr size_type size() const
@@ -510,9 +492,9 @@ namespace frd {
                 Kind == subrange_kind::sized
             ) {
                 if constexpr (StoreSize) {
-                    return this->_data.size;
+                    return this->_size;
                 } else {
-                    return static_cast<size_type>(this->_data.bound - this->_data.it);
+                    return static_cast<size_type>(this->_bound - this->_it);
                 }
             }
 
@@ -523,7 +505,7 @@ namespace frd {
             requires (
                 copyable<It>
             ) {
-                return this->_data.it;
+                return this->_it;
             }
 
             constexpr It begin()
@@ -533,14 +515,14 @@ namespace frd {
             requires (
                 !copyable<It>
             ) {
-                return frd::move(this->_data.it);
+                return frd::move(this->_it);
             }
 
             constexpr S end() const
             noexcept(
                 nothrow_constructible_from<S, const S &>
             ) {
-                return this->_data.bound;
+                return this->_bound;
             }
 
             template<frd::size_t I>
@@ -556,9 +538,9 @@ namespace frd {
                 }()
             ) {
                 if constexpr (I == 0) {
-                    return this->_data.it;
+                    return this->_it;
                 } else {
-                    return this->_data.bound;
+                    return this->_bound;
                 }
             }
 
@@ -581,12 +563,12 @@ namespace frd {
                 if constexpr (I == 0) {
                     /* Only move the iterator if we have to. */
                     if constexpr (copyable<It>) {
-                        return this->_data.it;
+                        return this->_it;
                     } else {
-                        return frd::move(this->_data.it);
+                        return frd::move(this->_it);
                     }
                 } else {
-                    return this->_data.bound;
+                    return this->_bound;
                 }
             }
 
@@ -596,15 +578,15 @@ namespace frd {
                 _pair_like_convertible_from<PairLike, const It &, const S &>
             )
             constexpr operator PairLike() const {
-                return PairLike(this->_data.it, this->_data.bound);
+                return PairLike(this->_it, this->_bound);
             }
 
             constexpr subrange &advance(const difference_type n) {
                 /* TODO: Do we need to worry about the stored size here? */
-                const auto diff = frd::advance(this->_data.it, n, this->_data.bound);
+                const auto diff = frd::advance(this->_it, n, this->_bound);
 
                 if constexpr (StoreSize) {
-                    this->_data.size -= frd::to_unsigned(n - diff);
+                    this->_size -= frd::to_unsigned(n - diff);
                 }
 
                 return *this;
@@ -957,26 +939,13 @@ namespace frd {
                 )
             );
 
-            struct _data_without_cached_common_end {
-                [[no_unique_address]] V base = V();
-            };
+            [[no_unique_address]] V _base = V();
 
-            struct _data_with_cached_common_end {
-                [[no_unique_address]] V base = V();
-
-                cached_iterator<V> cached_common_end = {};
-
-                template<forwarder_for<V> VFwd>
-                constexpr _data_with_cached_common_end(VFwd &&base) : base(frd::forward<VFwd>(base)) { }
-            };
-
-            using data = conditional<StoreCachedCommonEnd, _data_with_cached_common_end, _data_without_cached_common_end>;
-
-            [[no_unique_address]] data _data;
+            [[no_unique_address]] maybe_present<StoreCachedCommonEnd, cached_iterator<V>> _cached_common_end = {};
 
             constexpr reverse_view() requires (default_constructible<V>) = default;
 
-            constexpr reverse_view(V base) : _data(frd::move(base)) { }
+            constexpr reverse_view(V base) : _base(frd::move(base)) { }
 
             constexpr V base() const &
             noexcept(
@@ -985,7 +954,7 @@ namespace frd {
             requires (
                 copy_constructible<V>
             ) {
-                return this->_data.base;
+                return this->_base;
             }
 
             constexpr V base() &&
@@ -995,7 +964,7 @@ namespace frd {
             requires (
                 !copy_constructible<V>
             ) {
-                return frd::move(this->_data.base);
+                return frd::move(this->_base);
             }
 
             constexpr iterator begin()
@@ -1009,37 +978,37 @@ namespace frd {
                 }()
             ) {
                 if constexpr (common_range<V>) {
-                    return reverse_iterator(frd::end(this->_data.base));
+                    return reverse_iterator(frd::end(this->_base));
                 } else if constexpr (StoreCachedCommonEnd) {
-                    if (this->_data.cached_common_end.has_value()) {
-                        return reverse_iterator(this->_data.cached_common_end.get(this->_data.base));
+                    if (this->_cached_common_end.has_value()) {
+                        return reverse_iterator(this->_cached_common_end.get(this->_base));
                     }
 
-                    auto common_end = frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
+                    auto common_end = frd::next(frd::begin(this->_base), frd::end(this->_base));
 
-                    this->_data.cached_common_end.set(this->_data.base, common_end);
+                    this->_cached_common_end.set(this->_base, common_end);
 
                     return reverse_iterator(frd::move(common_end));
                 } else {
-                    return reverse_iterator(frd::next(frd::begin(this->_data.base), frd::end(this->_data.base)));
+                    return reverse_iterator(frd::next(frd::begin(this->_base), frd::end(this->_base)));
                 }
             }
 
             constexpr auto begin() const
             noexcept(
-                noexcept(reverse_iterator(frd::end(this->_data.base)))
+                noexcept(reverse_iterator(frd::end(this->_base)))
             )
             requires (
                 common_range<const V>
             ) {
-                return reverse_iterator(frd::end(this->_data.base));
+                return reverse_iterator(frd::end(this->_base));
             }
 
             constexpr iterator end()
             noexcept(
-                noexcept(reverse_iterator(frd::begin(this->_data.base)))
+                noexcept(reverse_iterator(frd::begin(this->_base)))
             ) {
-                return reverse_iterator(frd::begin(this->_data.base));
+                return reverse_iterator(frd::begin(this->_base));
             }
 
             /*
@@ -1049,32 +1018,32 @@ namespace frd {
             */
             constexpr auto end() const
             noexcept(
-                noexcept(reverse_iterator(frd::begin(this->_data.base)))
+                noexcept(reverse_iterator(frd::begin(this->_base)))
             )
             requires (
                 common_range<const V>
             ) {
-                return reverse_iterator(frd::begin(this->_data.base));
+                return reverse_iterator(frd::begin(this->_base));
             }
 
             constexpr auto size()
             noexcept(
-                noexcept(frd::size(this->_data.base))
+                noexcept(frd::size(this->_base))
             )
             requires (
                 sized_range<V>
             ) {
-                return frd::size(this->_data.base);
+                return frd::size(this->_base);
             }
 
             constexpr auto size() const
             noexcept(
-                noexcept(frd::size(this->_data.base))
+                noexcept(frd::size(this->_base))
             )
             requires (
                 sized_range<const V>
             ) {
-                return frd::size(this->_data.base);
+                return frd::size(this->_base);
             }
     };
 

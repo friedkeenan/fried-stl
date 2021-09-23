@@ -408,6 +408,11 @@ namespace frd {
     template<typename T>
     using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
 
+    struct _empty { };
+
+    template<bool IsPresent, typename T>
+    using maybe_present = conditional<IsPresent, T, _empty>;
+
     /* Only operations on types that are forced to use STL APIs below. */
 
     template<typename T>
