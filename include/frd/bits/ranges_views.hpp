@@ -5,6 +5,7 @@
 
 #include <frd/bits/ranges_base.hpp>
 #include <frd/bits/ranges_operations.hpp>
+#include <frd/bits/ranges_util.hpp>
 
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
@@ -432,25 +433,33 @@ namespace frd {
                 [[no_unique_address]] S  bound;
 
                 size_type size = 0;
+
+                constexpr _data_with_size() = default;
+
+                template<forwarder_for<It> ItFwd, forwarder_for<S> SFwd>
+                constexpr _data_with_size(ItFwd &&it, SFwd &&bound, const size_type size = 0)
+                    : it(frd::forward<ItFwd>(it)), bound(frd::forward<SFwd>(bound)), size(size) { }
             };
 
             /* Only store the size if we need to. */
             using data = conditional<StoreSize, _data_with_size, _data_without_size>;
 
-            data _data;
+            [[no_unique_address]] data _data;
 
             constexpr subrange() requires (default_constructible<It>) : _data(It(), S()) { }
 
             template<convertible_to_non_slicing<It> ItOther>
-            constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _data({frd::move(it), bound}) { }
+            constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _data(frd::move(it), bound) { }
 
             template<convertible_to_non_slicing<It> ItOther>
             requires (Kind == subrange_kind::sized && !StoreSize)
-            constexpr subrange(ItOther it, S bound, const size_type size) : _data({frd::move(it), bound}) { }
+            constexpr subrange(ItOther it, S bound, const size_type size) : _data(frd::move(it), bound) {
+                FRD_UNUSED(size);
+            }
 
             template<convertible_to_non_slicing<It> ItOther>
             requires (Kind == subrange_kind::sized && StoreSize)
-            constexpr subrange(ItOther it, S bound, const size_type size) : _data({frd::move(it), bound, size}) { }
+            constexpr subrange(ItOther it, S bound, const size_type size) : _data(frd::move(it), bound, size) { }
 
             template<borrowed_range R>
             requires (
@@ -489,13 +498,13 @@ namespace frd {
 
             constexpr size_type size() const
             noexcept(
-                [this]() {
+                []() {
                     if constexpr (StoreSize) {
                         return true;
                     } else {
-                        return noexcept(static_cast<size_type>(this->_data.bound - this->_data.it));
+                        return noexcept(static_cast<size_type>(frd::declval<const S &>() - frd::declval<const It &>()));
                     }
-                }
+                }()
             )
             requires (
                 Kind == subrange_kind::sized
@@ -718,11 +727,6 @@ namespace frd {
 
     }
 
-    #define VIEW_DEDUCTION_GUIDE(cls)     \
-        template<typename R>              \
-        cls(R &&) -> cls<views::all_t<R>>
-
-
     template<bidirectional_iterator It>
     class reverse_iterator {
         public:
@@ -755,12 +759,13 @@ namespace frd {
                 'reverse_iterator' and access the underlying iterator, then we can rename
                 this member.
             */
-            It _it;
+            It _it = It();
 
-            constexpr reverse_iterator() : _it() { }
+            constexpr reverse_iterator() noexcept(nothrow_constructible_from<It>) = default;
 
             template<forwarder_for<It> ItFwd>
-            constexpr explicit reverse_iterator(ItFwd &&it) : _it(frd::forward<ItFwd>(it)) { }
+            constexpr explicit reverse_iterator(ItFwd &&it) noexcept(nothrow_constructible_from<It, ItFwd>)
+                : _it(frd::forward<ItFwd>(it)) { }
 
             template<typename ItOther>
             requires (!same_as<ItOther, It> && convertible_to<const ItOther &, It>)
@@ -928,6 +933,184 @@ namespace frd {
 
     template<typename It>
     reverse_iterator(It &&) -> reverse_iterator<decay<It>>;
+
+    template<view V>
+    requires (bidirectional_range<V>)
+    class reverse_view : public view_interface<reverse_view<V>> {
+        public:
+            /* Don't define 'const_iterator' as we're not sure 'const V' is a range. */
+            using iterator = reverse_iterator<range_iterator<V>>;
+
+            static constexpr bool StoreCachedBegin = !(
+                common_range<V> &&
+
+                /*
+                    If it's a random access range with a sized sentinel, we can
+                    also get the common end of the view in constant time.
+                */
+                (
+                    random_access_range<V> &&
+                    sized_sentinel_for<
+                        range_sentinel<V>,
+                        range_iterator<V>
+                    >
+                )
+            );
+
+            struct _data_without_cached_begin {
+                [[no_unique_address]] V base = V();
+            };
+
+            struct _data_with_cached_begin {
+                [[no_unique_address]] V base = V();
+
+                cached_iterator<V> cached_begin = {};
+
+                template<forwarder_for<V> VFwd>
+                constexpr _data_with_cached_begin(VFwd &&base) : base(frd::forward<VFwd>(base)) { }
+            };
+
+            using data = conditional<StoreCachedBegin, _data_with_cached_begin, _data_without_cached_begin>;
+
+            [[no_unique_address]] data _data;
+
+            constexpr reverse_view() requires (default_constructible<V>) = default;
+
+            constexpr reverse_view(V base) : _data(frd::move(base)) { }
+
+            constexpr V base() const &
+            noexcept(
+                nothrow_constructible_from<V, const V &>
+            )
+            requires (
+                copy_constructible<V>
+            ) {
+                return this->_data.base;
+            }
+
+            constexpr V base() &&
+            noexcept(
+                nothrow_constructible_from<V, V &&>
+            )
+            requires (
+                !copy_constructible<V>
+            ) {
+                return frd::move(this->_data.base);
+            }
+
+            constexpr iterator begin()
+            noexcept(
+                []() {
+                    if constexpr (common_range<V>) {
+                        return noexcept(reverse_iterator(frd::end(frd::declval<V &>())));
+                    } else {
+                        return false;
+                    }
+                }()
+            ) {
+                if constexpr (common_range<V>) {
+                    return reverse_iterator(frd::end(this->_data.base));
+                } else if constexpr (StoreCachedBegin) {
+                    if (this->_data.cached_begin.has_value()) {
+                        return reverse_iterator(this->_data.cached_begin.get(this->_data.base));
+                    }
+
+                    const auto common_end = frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
+
+                    this->_data.cached_begin.set(this->_data.base, common_end);
+
+                    return common_end;
+                } else {
+                    return frd::next(frd::begin(this->_data.base), frd::end(this->_data.base));
+                }
+            }
+
+            constexpr auto begin() const
+            noexcept(
+                noexcept(reverse_iterator(frd::end(this->_data.base)))
+            )
+            requires (
+                common_range<const V>
+            ) {
+                return reverse_iterator(frd::end(this->_data.base));
+            }
+
+            constexpr iterator end()
+            noexcept(
+                noexcept(reverse_iterator(frd::begin(this->_data.base)))
+            )
+            requires (
+                common_range<V>
+            ) {
+                return reverse_iterator(frd::begin(this->_data.base));
+            }
+
+            constexpr auto end() const
+            noexcept(
+                noexcept(reverse_iterator(frd::begin(this->_data.base)))
+            )
+            requires (
+                common_range<const V>
+            ) {
+                return reverse_iterator(frd::begin(this->_data.base));
+            }
+
+            constexpr auto size()
+            noexcept(
+                noexcept(frd::size(this->_data.base))
+            )
+            requires (
+                sized_range<V>
+            ) {
+                return frd::size(this->_data.base);
+            }
+
+            constexpr auto size() const
+            noexcept(
+                noexcept(frd::size(this->_data.base))
+            )
+            requires (
+                sized_range<const V>
+            ) {
+                return frd::size(this->_data.base);
+            }
+    };
+
+    template<typename R>
+    reverse_view(R &&) -> reverse_view<views::all_t<R>>;
+
+    namespace views {
+
+        template<typename T>
+        constexpr inline bool _reverse_view_specialization = false;
+
+        template<typename V>
+        constexpr inline bool _reverse_view_specialization<reverse_view<V>> = true;
+
+        template<typename T>
+        constexpr inline bool _reversed_subrange = false;
+
+        template<typename It, subrange_kind Kind>
+        constexpr inline bool _reversed_subrange<subrange<reverse_iterator<It>, reverse_iterator<It>, Kind>> = true;
+
+        constexpr inline frd::range_adaptor_closure reverse =
+            []<viewable_range R>(R &&r) {
+                /* Unwrap already reversed ranges if we can. */
+
+                if constexpr (_reverse_view_specialization<remove_cvref<R>>) {
+                    return frd::forward<R>(r).base();
+                } else if constexpr (_reversed_subrange<remove_cvref<R>>) {
+                    if constexpr (sized_range<R>) {
+                        return subrange(r.end().base(), r.begin.base(), r.size());
+                    } else {
+                        return subrange(r.end.base(), r.begin.base());
+                    }
+                } else {
+                    return reverse_view(frd::forward<R>(r));
+                }
+            };
+
+    }
 
     /*
         A view over an interval [start, end), similar to Python's 'range'.
@@ -1128,12 +1311,7 @@ namespace frd {
             noexcept(
                 nothrow_constructible_from<Start, StartFwd> &&
                 nothrow_constructible_from<End,   EndFwd>
-            ) : _start(frd::forward<StartFwd>(start)), _end(frd::forward<EndFwd>(end))
-            {
-                if constexpr (weakly_less_than_comparable_with<const Start &, const End &>) {
-                    FRD_ASSERT(start < end, "Interval malformed!");
-                }
-            }
+            ) : _start(frd::forward<StartFwd>(start)), _end(frd::forward<EndFwd>(end)) { }
 
             template<forwarder_for<End> EndFwd>
             requires (integral<Start>)
@@ -1143,20 +1321,23 @@ namespace frd {
             ) : interval(Start{}, frd::forward<EndFwd>(end)) { }
 
             [[nodiscard]]
-            constexpr iterator begin() const &
+            constexpr iterator begin() const
             noexcept(
                 nothrow_constructible_from<iterator, const Start &>
             )
             requires (
-                copyable<Start>
+                copy_constructible<Start>
             ) {
                 return iterator(this->_start);
             }
 
             [[nodiscard]]
-            constexpr iterator begin() &&
+            constexpr iterator begin()
             noexcept(
                 nothrow_constructible_from<iterator, Start &&>
+            )
+            requires (
+                !copy_constructible<Start>
             ) {
                 /* To be weakly incrementable, a type must be movable, so no need to check here. */
 
@@ -1200,8 +1381,6 @@ namespace frd {
 
     }
 
-    #undef VIEW_DEDUCTION_GUIDE
-
 }
 
 /* Templated variable specializations must be in the proper namespace. */
@@ -1214,6 +1393,9 @@ namespace std {
 
         template<typename It, typename S, frd::subrange_kind Kind>
         constexpr inline bool enable_borrowed_range<frd::subrange<It, S, Kind>> = true;
+
+        template<typename V>
+        constexpr inline bool enable_borrowed_range<frd::reverse_view<V>> = enable_borrowed_range<V>;
 
         template<typename Start, typename End>
         constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;

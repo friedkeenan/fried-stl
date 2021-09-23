@@ -93,6 +93,21 @@ static_assert(fuck());
 
 static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 
+consteval bool shit() {
+    bool success = true;
+
+    int compare = 4;
+    for (const auto i : frd::interval(5) | frd::views::reverse | frd::views::iterators) {
+        success = (success && (*i == compare));
+
+        compare--;
+    }
+
+    return success;
+}
+
+static_assert(shit());
+
 int main(int argc, char **argv) {
     FRD_UNUSED(argc, argv);
 
@@ -108,7 +123,9 @@ int main(int argc, char **argv) {
 
     static_assert(frd::reverse_iterator(fuck.end())[0] == 2);
 
-    for (auto i = frd::reverse_iterator(fuck.end()); i != frd::reverse_iterator(fuck.begin()); i++) {
+    static_assert(frd::subrange(fuck).size() == 2);
+
+    for (const auto i : frd::interval(5) | frd::views::reverse | frd::views::iterators) {
         std::printf("%d\n", *i);
     }
 

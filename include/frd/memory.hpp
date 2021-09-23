@@ -235,7 +235,7 @@ namespace frd {
                 T elem;
 
                 /* Cannot be defaulted as then it will try to default-construct 'elem'. */
-                constexpr UnitializedElement() { }
+                constexpr UnitializedElement() noexcept { }
             };
 
             constexpr allocator() noexcept = default;

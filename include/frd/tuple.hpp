@@ -205,14 +205,6 @@ namespace frd {
 
                 return (*this <=> rhs) == 0;
             }
-
-            constexpr Head &operator [](const frd::size_t index) noexcept requires SameTypes {
-                return *(this->begin() + index);
-            }
-
-            constexpr const Head &operator [](const frd::size_t index) const noexcept requires SameTypes {
-                return *(this->begin() + index);
-            }
     };
 
     template<>

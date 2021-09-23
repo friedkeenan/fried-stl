@@ -2,6 +2,7 @@
 
 #include <iterator>
 
+#include <frd/memory.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 
@@ -217,17 +218,19 @@ namespace frd {
         (_empty_iter_traits<StdTraits> && _empty_iter_traits<FrdTraits>) ||
 
         (
-            same_as<typename StdTraits::iterator_category, typename FrdTraits::iterator_category> &&
-            same_as<typename StdTraits::value_type,        typename FrdTraits::value_type>        &&
-            same_as<typename StdTraits::difference_type,   typename FrdTraits::difference_type>   &&
-            same_as<typename StdTraits::pointer,           typename FrdTraits::pointer>           &&
-            same_as<typename StdTraits::reference,         typename FrdTraits::reference>
-        ) &&
+            (
+                same_as<typename StdTraits::iterator_category, typename FrdTraits::iterator_category> &&
+                same_as<typename StdTraits::value_type,        typename FrdTraits::value_type>        &&
+                same_as<typename StdTraits::difference_type,   typename FrdTraits::difference_type>   &&
+                same_as<typename StdTraits::pointer,           typename FrdTraits::pointer>           &&
+                same_as<typename StdTraits::reference,         typename FrdTraits::reference>
+            ) &&
 
-        /* 'std::iterator_traits<It>' can have an 'iterator_concept' member if specialized. */
-        !requires {
-            typename StdTraits::iterator_concept;
-        }
+            /* 'std::iterator_traits<It>' can have an 'iterator_concept' member if specialized. */
+            !requires {
+                typename StdTraits::iterator_concept;
+            }
+        )
     );
 
     template<typename It>
@@ -548,8 +551,8 @@ namespace frd {
         NOTE: Our implementation is *slightly* different from the standard's as we only
         check if each value in 'iterator_traits<It>' is the same as the one generated
         from the primary template. This can lead to situations where 'iterator_traits<It>'
-        has all the same values as the primary template, but does not define 'iterator_concept'
-        or 'iterator_category', leading to 'iter_concept<It>' spitting out
+        has all the same values as the primary template, but 'It' doesn't have 'iterator_concept'
+        or 'iterator_category' members, leading to 'iter_concept<It>' spitting out
         'std::random_access_iterator_tag', when the standard would use
         'iterator_traits<It>::iterator_category'. However, this deviance from the standard should
         only impact iterators opting out of being counted as e.g. a random access iterator,

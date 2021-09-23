@@ -96,6 +96,38 @@ namespace frd {
 
     constexpr inline _advance_fn advance;
 
+    struct _next_fn {
+        template<iterator It>
+        constexpr It operator ()(It it) const {
+            it++;
+
+            return it;
+        }
+
+        template<iterator It>
+        constexpr It operator ()(It it, const iter_difference<It> n) const {
+            frd::advance(it, n);
+
+            return it;
+        }
+
+        template<iterator It, sentinel_for<It> S>
+        constexpr It operator ()(It it, S bound) const {
+            frd::advance(it, bound);
+
+            return it;
+        }
+
+        template<iterator It, sentinel_for<It> S>
+        constexpr It operator ()(It it, const iter_difference<It> n, S bound) const {
+            frd::advance(it, n, bound);
+
+            return it;
+        }
+    };
+
+    constexpr inline _next_fn next;
+
     struct _prev_fn {
         template<bidirectional_iterator It>
         [[nodiscard]]
@@ -113,7 +145,7 @@ namespace frd {
             return it;
         }
 
-        template<bidirectional_iterator It, sentinel_for<It> S = It>
+        template<bidirectional_iterator It, sentinel_for<It> S>
         [[nodiscard]]
         constexpr It operator ()(It it, iter_difference<It> n, S bound) const {
             frd::advance(it, n, bound);
