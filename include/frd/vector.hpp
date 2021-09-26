@@ -1,5 +1,7 @@
 #pragma once
 
+#include <initializer_list>
+
 #include <frd/limits.hpp>
 #include <frd/memory.hpp>
 #include <frd/ranges.hpp>
@@ -68,9 +70,9 @@ namespace frd {
                 return (begin + (it - begin));
             }
 
-            /* Malformed if 'new_capacity' is less than current size. */
             constexpr void _reserve_impl(const size_type new_capacity) {
-                /* TODO: Decide whether we should check against 'max_size'. */
+                FRD_ASSERT(new_capacity <= this->max_size(), "Cannot reserve enough data!");
+                FRD_ASSERT(new_capacity >= this->_size,      "Cannot reserve less than current size!");
 
                 const auto new_data = _allocator_traits::allocate(this->_allocator, new_capacity);
 
@@ -91,7 +93,7 @@ namespace frd {
 
             constexpr void reserve(size_type new_capacity) {
                 /* If we can already store more than requested, do nothing. */
-                if (new_capacity < this->_capacity) {
+                if (new_capacity <= this->_capacity) {
                     return;
                 }
 
@@ -115,7 +117,7 @@ namespace frd {
 
                 const auto location = this->_data + this->_size;
                 _allocator_traits::construct(this->_allocator, location, frd::forward<Args>(args)...);
-                this->_size += 1;
+                this->_size++;
 
                 return *location;
             }
@@ -123,6 +125,43 @@ namespace frd {
             template<forwarder_for<Element> ElementFwd>
             constexpr void push_back(ElementFwd &&obj) {
                 this->emplace_back(frd::forward<ElementFwd>(obj));
+            }
+
+            constexpr void _reserve_insert_impl(const const_iterator pos_to_insert, const size_type new_capacity, const size_type insert_size) {
+                /* Do our own reserve so we don't move our elements more than we need to. */
+
+                const auto new_data = _allocator_traits::allocate(this->_allocator, new_capacity);
+
+                auto new_location = new_data;
+                for (const auto elem_it : interval(this->begin(), this->end())) {
+                    /* Don't move elements into the place we're going to insert new ones. */
+                    if (elem_it == pos_to_insert) {
+                        new_location += insert_size;
+                    }
+
+                    _allocator_traits::construct(this->_allocator, new_location, frd::iter_move(elem_it));
+                    _allocator_traits::destroy  (this->_allocator, pointer{elem_it});
+
+                    new_location++;
+                }
+
+                this->_free_data();
+
+                this->_data     = new_data;
+                this->_capacity = new_capacity;
+            }
+
+            constexpr void _shift_elements(const iterator begin_shift, const size_type shift_size) {
+                /*
+                    Loop starting from the end so we can just move each element over
+                    without overwriting any other element.
+                */
+                for (const auto elem_it : frd::interval(begin_shift, this->end()) | views::reverse) {
+                    const auto elem_addr = pointer{elem_it};
+
+                    _allocator_traits::construct(this->_allocator, elem_addr + shift_size, frd::iter_move(elem_it));
+                    _allocator_traits::destroy  (this->_allocator, elem_addr);
+                }
             }
 
             template<typename... Args>
@@ -135,48 +174,72 @@ namespace frd {
 
                     this->_reserve_impl(1);
                 } else if (this->_size + 1 > this->_capacity) {
-                    /* Do our own reserve so we don't move our elements more than we need to. */
-
-                    const auto new_capacity = NewCapacityRatio * this->_capacity;
-                    const auto new_data     = _allocator_traits::allocate(this->_allocator, new_capacity);
-
-                    auto new_location = new_data;
-                    for (const auto elem_it : interval(this->begin(), this->end())) {
-                        /* Skip the location we're going to be putting the new element. */
-                        if (elem_it == pos) {
-                            new_location++;
-                        }
-
-                        _allocator_traits::construct(this->_allocator, new_location, frd::move(*elem_it));
-                        _allocator_traits::destroy  (this->_allocator, pointer{elem_it});
-
-                        new_location++;
-                    }
-
-                    this->_free_data();
-
-                    this->_data     = new_data;
-                    this->_capacity = new_capacity;
+                    this->_reserve_insert_impl(pos, NewCapacityRatio * this->_capacity, 1);
                 } else if (!this->empty()) {
                     /* We do not need to move anything if we're empty. */
 
-                    /*
-                        Loop starting from the end so we can just move each element over one
-                        without overwriting any other element.
-                    */
-                    const auto mutable_pos = this->_to_mutable_iterator(pos);
-                    for (const auto elem_it : frd::interval(mutable_pos, this->end()) | views::reverse) {
-                        const auto elem_addr = pointer{elem_it};
-
-                        _allocator_traits::construct(this->_allocator, elem_addr + 1, frd::move(*elem_it));
-                        _allocator_traits::destroy  (this->_allocator, elem_addr);
-                    }
+                    this->_shift_elements(this->_to_mutable_iterator(pos), 1);
                 }
 
                 _allocator_traits::construct(this->_allocator, this->_data + emplace_offset, frd::forward<Args>(args)...);
-                this->_size += 1;
+                this->_size++;
 
                 return this->begin() + emplace_offset;
+            }
+
+            template<forwarder_for<Element> ElementFwd>
+            constexpr iterator insert(const const_iterator pos, ElementFwd &&obj) {
+                return this->emplace(pos, frd::forward<ElementFwd>(obj));
+            }
+
+            /*
+                We need this bit of indirection to allow brace-enclosed initializer
+                lists to be deduced to 'std::initializer_list', as the compiler will
+                not know it can use 'std::initializer_list' for 'R'.
+            */
+            template<typename R>
+            /* Requirements checked by callers. */
+            constexpr iterator _insert_range(const const_iterator pos, R &&insert_rng) {
+                const auto insert_size   = frd::size(insert_rng);
+                const auto insert_offset = pos - this->begin();
+
+                if (this->_capacity == 0) {
+                    /* Use '_reserve_impl' to avoid capacity checks. */
+
+                    this->_reserve_impl(insert_size);
+                } else if (this->_size + insert_size > this->_capacity) {
+                    this->_reserve_insert_impl(pos, NewCapacityRatio * this->_capacity, insert_size);
+                } else if (!this->empty()) {
+                    /* We do not need to move anything if we're empty. */
+
+                    this->_shift_elements(this->_to_mutable_iterator(pos), insert_size);
+                }
+
+                /* Insert the elements of the range into the empty locations we have made for it. */
+                auto insert_location = this->_data + insert_offset;
+                for (auto &&to_insert : insert_rng) {
+                    _allocator_traits::construct(this->_allocator, insert_location, frd::forward<decltype(to_insert)>(to_insert));
+
+                    insert_location++;
+                }
+
+                this->_size += insert_size;
+
+                return this->begin() + insert_offset;
+            }
+
+            constexpr iterator insert(const const_iterator pos, const std::initializer_list<Element> list) {
+                return this->_insert_range(pos, list);
+            }
+
+            template<sized_range R>
+            requires (
+                input_range<R>                                                    &&
+                same_as<remove_cvref<range_reference<R>>, Element>                &&
+                allocator_value_constructible_from<Allocator, range_reference<R>>
+            )
+            constexpr iterator insert(const const_iterator pos, R &&insert_rng) {
+                return this->_insert_range(pos, frd::forward<R>(insert_rng));
             }
 
             constexpr void pop_back() {
@@ -305,6 +368,21 @@ namespace frd {
             }
 
             [[nodiscard]]
+            constexpr reverse_iterator<iterator> rbegin() noexcept {
+                return reverse_iterator(this->end());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> rbegin() const noexcept {
+                return reverse_iterator(this->end());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> crbegin() const noexcept {
+                return reverse_iterator(this->cend());
+            }
+
+            [[nodiscard]]
             constexpr iterator end() noexcept {
                 return this->_data + this->_size;
             }
@@ -320,8 +398,23 @@ namespace frd {
             }
 
             [[nodiscard]]
+            constexpr reverse_iterator<iterator> rend() noexcept {
+                return reverse_iterator(this->begin());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> rend() const noexcept {
+                return reverse_iterator(this->begin());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> crend() const noexcept {
+                return reverse_iterator(this->cbegin());
+            }
+
+            [[nodiscard]]
             constexpr bool empty() const noexcept {
-                return this->size() <= 0;
+                return this->_size <= 0;
             }
 
             [[nodiscard]]
@@ -332,14 +425,14 @@ namespace frd {
             /* TODO: Do we want 'at'? I'm not really a fan of it. */
             [[nodiscard]]
             constexpr reference operator [](size_type index) noexcept {
-                FRD_ASSERT(index < this->size());
+                FRD_ASSERT(index < this->_size, "Index is past bounds of vector!");
 
                 return this->_data[index];
             }
 
             [[nodiscard]]
             constexpr const_reference operator [](size_type index) const noexcept {
-                FRD_ASSERT(index < this->size());
+                FRD_ASSERT(index < this->_size, "Index is past bounds of vector!");
 
                 return this->_data[index];
             }

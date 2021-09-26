@@ -94,11 +94,13 @@ namespace frd {
             }
         }
 
+        [[nodiscard]]
         constexpr bool has_value() const {
             return this->_initialized;
         }
 
         template<forwarder_for<R> RFwd>
+        [[nodiscard]]
         constexpr _iterator get(RFwd &&r) const {
             FRD_ASSERT(this->has_value(), "cached_iterator doesn't have a value!");
 
@@ -148,11 +150,13 @@ namespace frd {
             return *this;
         }
 
+        [[nodiscard]]
         constexpr bool has_value() const {
             return this->_offset >= 0;
         }
 
         template<forwarder_for<R> RFwd>
+        [[nodiscard]]
         constexpr _iterator get(RFwd &&r) const {
             FRD_ASSERT(this->has_value(), "cached_iterator doesn't have a value!");
 

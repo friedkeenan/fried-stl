@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <tuple>
 #include <iterator>
 
 #include <frd/bits/ranges_base.hpp>
@@ -423,12 +424,12 @@ namespace frd {
 
             static constexpr bool StoreSize = !sized_sentinel_for<S, It> && Kind == subrange_kind::sized;
 
-            [[no_unique_address]] It _it;
-            [[no_unique_address]] S  _bound;
+            [[no_unique_address]] It _it    = It();
+            [[no_unique_address]] S  _bound = S();
 
             [[no_unique_address]] maybe_present<StoreSize, size_type> _size = {};
 
-            constexpr subrange() requires (default_constructible<It>) : _it(It()), _bound(S()) { }
+            constexpr subrange() requires (default_constructible<It>) = default;
 
             template<convertible_to_non_slicing<It> ItOther>
             constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _it(frd::move(it)), _bound(bound) { }
@@ -635,8 +636,23 @@ namespace frd {
             }
     };
 
+    /*
+        Don't think I should need to specify 'Kind', but GCC freaks out if I don't.
+
+        TODO: This seems to be fixed in GCC trunk.
+    */
     template<iterator It, sentinel_for<It> S>
-    subrange(It, S) -> subrange<It, S>;
+    subrange(It, S) -> subrange<
+        It,
+        S,
+        []() {
+            if constexpr (sized_sentinel_for<S, It>) {
+                return subrange_kind::sized;
+            } else {
+                return subrange_kind::unsized;
+            }
+        }()
+    >;
 
     template<iterator It, sentinel_for<It> S>
     subrange(It, S, make_unsigned<iter_difference<It>>) -> subrange<It, S, subrange_kind::sized>;
@@ -663,18 +679,6 @@ namespace frd {
         range_sentinel<R>,
         subrange_kind::sized
     >;
-
-    template<typename It, typename S, subrange_kind Kind>
-    constexpr inline frd::size_t tuple_size<subrange<It, S, Kind>> = 2;
-
-    template<typename It, typename S, subrange_kind Kind>
-    struct tuple_element_holder<0, subrange<It, S, Kind>> : type_holder<It> { };
-
-    template<typename It, typename S, subrange_kind Kind>
-    struct tuple_element_holder<1, subrange<It, S, Kind>> : type_holder<S> { };
-
-    template<frd::size_t I, typename It, typename S, subrange_kind Kind>
-    struct tuple_element_holder<I, const subrange<It, S, Kind>> : tuple_element_holder<I, subrange<It, S, Kind>> { };
 
     namespace views {
 
@@ -1375,5 +1379,17 @@ namespace std {
 
     template<typename It>
     constexpr inline bool disable_sized_sentinel_for<frd::reverse_iterator<It>, frd::reverse_iterator<It>> = disable_sized_sentinel_for<It, It>;
+
+    template<typename It, typename S, frd::subrange_kind Kind>
+    struct tuple_size<frd::subrange<It, S, Kind>> : frd::constant_holder<frd::size_t{2}> { };
+
+    template<typename It, typename S, frd::subrange_kind Kind>
+    struct tuple_element<0, frd::subrange<It, S, Kind>> : frd::type_holder<It> { };
+
+    template<typename It, typename S, frd::subrange_kind Kind>
+    struct tuple_element<1, frd::subrange<It, S, Kind>> : frd::type_holder<S> { };
+
+    template<frd::size_t I, typename It, typename S, frd::subrange_kind Kind>
+    struct tuple_element<I, const frd::subrange<It, S, Kind>> : tuple_element<I, frd::subrange<It, S, Kind>> { };
 
 }

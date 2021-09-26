@@ -73,6 +73,7 @@ consteval bool fuck() {
     };
 
     auto v = frd::vector<S>();
+    v.insert(v.end(), {S(true)});
     v.emplace(v.end(), true);
 
     v.emplace_back(true);
@@ -86,8 +87,11 @@ consteval bool fuck() {
 
     v.emplace(v.begin(), false);
     v.emplace(v.begin(), true);
+    v.insert(v.end(), S(true));
 
-    return noexcept(frd::begin(v)) && v[0].value && !v[1].value && v.capacity() == 5;
+    v.insert(v.end(), frd::array{S(false), S(true)});
+
+    return v[0].value && !v[1].value && v[2].value && v.back().value && v.capacity() == 8;
 }
 
 static_assert(fuck());
@@ -117,6 +121,14 @@ consteval bool shit() {
 
 static_assert(shit());
 
+consteval bool cuck() {
+    const auto storage = frd::bit_storage(5);
+
+    return storage.unpack<int>() == 5;
+}
+
+static_assert(cuck());
+
 int main(int argc, char **argv) {
     FRD_UNUSED(argc, argv);
 
@@ -133,6 +145,8 @@ int main(int argc, char **argv) {
     static_assert(frd::reverse_iterator(fuck.end())[0] == 2);
 
     static_assert(frd::subrange(fuck).size() == 2);
+
+    static_assert(frd::subrange(fuck.begin(), fuck.end()).size() == 2);
 
     for (const auto i : frd::interval(5) | frd::views::reverse | frd::views::iterators) {
         std::printf("%d\n", *i);

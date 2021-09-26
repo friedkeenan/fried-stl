@@ -345,6 +345,9 @@ namespace frd {
         (!view<remove_cvref<R>> && borrowed_range<R>)
     );
 
+    template<range R>
+    using borrowed_iterator = conditional<borrowed_range<R>, range_iterator<R>, inert_type>;
+
 }
 
 namespace std::ranges {

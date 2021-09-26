@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
 #include <frd/tuple.hpp>
@@ -90,6 +92,21 @@ namespace frd {
                 return this->begin();
             }
 
+            [[nodiscard]]
+            constexpr reverse_iterator<iterator> rbegin() noexcept {
+                return reverse_iterator(this->end());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> rbegin() const noexcept {
+                return reverse_iterator(this->end());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> crbegin() const noexcept {
+                return reverse_iterator(this->cend());
+            }
+
             constexpr iterator end() noexcept {
                 return this->begin() + Size;
             }
@@ -102,14 +119,30 @@ namespace frd {
                 return this->end();
             }
 
+            [[nodiscard]]
+            constexpr reverse_iterator<iterator> rend() noexcept {
+                return reverse_iterator(this->begin());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> rend() const noexcept {
+                return reverse_iterator(this->begin());
+            }
+
+            [[nodiscard]]
+            constexpr reverse_iterator<const_iterator> crend() const noexcept {
+                return reverse_iterator(this->cbegin());
+            }
+
+
             constexpr reference operator [](const size_type index) noexcept {
-                FRD_ASSERT(index < Size);
+                FRD_ASSERT(index < Size, "Index is past bounds of array!");
 
                 return this->_elems[index];
             }
 
             constexpr const_reference operator [](const size_type index) const noexcept {
-                FRD_ASSERT(index < Size);
+                FRD_ASSERT(index < Size, "Index is past bounds of array!");
 
                 return this->_elems[index];
             }
@@ -161,12 +194,6 @@ namespace frd {
     template<typename Head, typename... Rest>
     array(Head, Rest...) -> array<Head, sizeof...(Rest) + 1>;
 
-    template<typename T, frd::size_t N>
-    constexpr inline frd::size_t tuple_size<array<T, N>> = N;
-
-    template<frd::size_t I, typename T, frd::size_t N>
-    struct tuple_element_holder<I, array<T, N>> : type_holder<T> { };
-
     template<typename T, frd::size_t N, frd::size_t... I>
     constexpr array<remove_cv<T>, N> _to_array(const T (&arr)[N], index_sequence<I...>) {
         return {arr[I]...};
@@ -186,5 +213,15 @@ namespace frd {
     constexpr array<remove_cv<T>, N> to_array(T (&&arr)[N]) {
         return _to_array(frd::move(arr), make_index_sequence<N>{});
     }
+
+}
+
+namespace std {
+
+    template<typename T, frd::size_t N>
+    struct tuple_size<frd::array<T, N>> : frd::constant_holder<N> { };
+
+    template<frd::size_t I, typename T, frd::size_t N>
+    struct tuple_element<I, frd::array<T, N>> : frd::type_holder<T> { };
 
 }

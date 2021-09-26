@@ -408,10 +408,17 @@ namespace frd {
     template<typename T>
     using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
 
-    struct _empty { };
+    struct inert_type {
+        constexpr inert_type() noexcept = default;
+
+        template<typename... Args>
+        constexpr inert_type(Args &&... args) noexcept {
+            FRD_UNUSED(args...);
+        }
+    };
 
     template<bool IsPresent, typename T>
-    using maybe_present = conditional<IsPresent, T, _empty>;
+    using maybe_present = conditional<IsPresent, T, inert_type>;
 
     /* Only operations on types that are forced to use STL APIs below. */
 

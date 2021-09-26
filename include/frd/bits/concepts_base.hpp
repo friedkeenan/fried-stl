@@ -33,6 +33,16 @@ namespace frd {
         }
     );
 
+    template<typename From, typename To>
+    concept nothrow_convertible_to = (
+        convertible_to<From, To>                    &&
+        nothrow_implicitly_convertible_to<From, To> &&
+
+        requires(void (&func)(To) noexcept, From &&from) {
+            requires noexcept(func(frd::forward<From>(from)));
+        }
+    );
+
     template<typename B>
     concept boolean_testable = convertible_to<B, bool> && requires(B &&b) {
         { !forward<B>(b) } -> convertible_to<bool>;

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include <frd/bits/arithmetic_base.hpp>
 #include <frd/bits/type_traits_base.hpp>
 
 namespace frd {
@@ -41,8 +42,18 @@ namespace frd {
         return frd::_declval_impl<T>();
     }
 
+    struct _dummy_compile_time_str {
+        consteval _dummy_compile_time_str() = default;
+
+        /* Implicit cast from string literal. */
+        template<frd::size_t N>
+        consteval _dummy_compile_time_str(const char (&str)[N]) {
+            FRD_UNUSED(str);
+        }
+    };
+
     [[noreturn]]
-    inline void unreachable(const char *msg = nullptr) {
+    inline void unreachable(const _dummy_compile_time_str msg = {}) {
         FRD_UNUSED(msg);
 
         /* Here we can have different implementations for unreachable code. */
@@ -55,4 +66,4 @@ namespace frd {
 /* NOTE: 'FRD_ASSERT' does not give a meaningful error at runtime, but instead ends up invoking undefined behavior. */
 
 /* Don't use braced-if so that we require a semicolon after the macro. */
-#define FRD_ASSERT(expr, ...) if (!(expr)) ::frd::unreachable()
+#define FRD_ASSERT(expr, ...) if (!(expr)) ::frd::unreachable(__VA_ARGS__)

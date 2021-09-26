@@ -1,6 +1,7 @@
 #pragma once
 
-#include <frd/arithmetic.hpp>
+#include <frd/bits/arithmetic_base.hpp>
+
 #include <frd/tuple.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>

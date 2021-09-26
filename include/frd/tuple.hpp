@@ -11,19 +11,9 @@
 
 namespace frd {
 
-    /* Can be specialized, which will also reflect in the STL template. */
+    /* Should not be specialized. */
     template<typename T>
     constexpr inline frd::size_t tuple_size = std::tuple_size<remove_cvref<T>>::value;
-
-    template<typename T>
-    concept _should_use_frd_tuple_size = incomplete<std::tuple_size<T>>;
-
-    /* Specializations will have their 'type' static member reflected in the STL template. */
-    template<frd::size_t I, typename T>
-    struct tuple_element_holder;
-
-    template<frd::size_t I, typename T>
-    concept _should_use_frd_tuple_element = !incomplete<::frd::tuple_element_holder<I, T>>;
 
     template<frd::size_t I, typename T>
     using tuple_element = typename std::tuple_element<I, remove_reference<T>>::type;
@@ -95,8 +85,8 @@ namespace frd {
 
     template<typename T>
     concept pair_like = !reference<T> && requires(T t) {
-        tuple_size<T>;
-        tuple_size<T> == 2;
+        std::tuple_size<T>::value;
+        requires tuple_size<T> == 2;
 
         typename tuple_element<0, remove_const<T>>;
         typename tuple_element<1, remove_const<T>>;
@@ -216,28 +206,19 @@ namespace frd {
     template<typename... Ts>
     tuple(Ts...) -> tuple<Ts...>;
 
-    template<typename... Ts>
-    constexpr inline frd::size_t tuple_size<tuple<Ts...>> = sizeof...(Ts);
-
-    /* Recursive case. */
-    template<frd::size_t I, typename Head, typename... Tail>
-    struct tuple_element_holder<I, tuple<Head, Tail...>> : tuple_element_holder<I - 1, tuple<Tail...>> { };
-
-    /* Base case. */
-    template<typename Head, typename... Tail>
-    struct tuple_element_holder<0, tuple<Head, Tail...>> : type_holder<Head> { };
-
 }
 
 namespace std {
 
-    /* Shims for compatibility between fried-stl and STL templates. */
+    template<typename... Ts>
+    struct tuple_size<frd::tuple<Ts...>> : frd::constant_holder<sizeof...(Ts)> { };
 
-    template<frd::_should_use_frd_tuple_size T>
-    struct tuple_size<T> : frd::constant_holder<frd::tuple_size<T>> { };
+    /* Recursive case. */
+    template<frd::size_t I, typename Head, typename... Tail>
+    struct tuple_element<I, frd::tuple<Head, Tail...>> : tuple_element<I - 1, frd::tuple<Tail...>> { };
 
-    template<frd::size_t I, typename T>
-    requires (frd::_should_use_frd_tuple_element<I, T>)
-    struct tuple_element<I, T> : frd::tuple_element_holder<I, T> { };
+    /* Base case. */
+    template<typename Head, typename... Tail>
+    struct tuple_element<0, frd::tuple<Head, Tail...>> : frd::type_holder<Head> { };
 
 }

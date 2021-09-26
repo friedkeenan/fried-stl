@@ -412,6 +412,9 @@ namespace frd {
     };
 
     template<typename In, typename Out>
+    concept indirectly_copyable = indirectly_readable<In> && indirectly_writable<Out, iter_reference<In>>;
+
+    template<typename In, typename Out>
     concept indirectly_movable = indirectly_readable<In> && indirectly_writable<Out, iter_rvalue_reference<In>>;
 
     template<typename In, typename Out>
