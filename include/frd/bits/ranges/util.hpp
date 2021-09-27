@@ -1,6 +1,7 @@
 #pragma once
 
-#include <frd/bits/ranges_base.hpp>
+#include <frd/bits/ranges/iterators.hpp>
+#include <frd/bits/ranges/access.hpp>
 
 #include <frd/utility.hpp>
 #include <frd/concepts.hpp>
