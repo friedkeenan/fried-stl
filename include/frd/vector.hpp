@@ -229,12 +229,23 @@ namespace frd {
                 return insert_it;
             }
 
-            constexpr iterator insert(const const_iterator pos, const std::initializer_list<Element> list) {
+            constexpr iterator insert(const const_iterator pos, const std::initializer_list<Element> list)
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) {
                 return this->_insert_range(pos, list);
             }
 
             template<sized_range R>
             requires (
+                /*
+                    Stops ambiguity between single element overload and this one.
+
+                    This is needed for the very slim edge case where our element
+                    type is a range for itself, which is indeed possible.
+                */
+                !forwarder_for<R, Element> &&
+
                 input_range<R>                                                    &&
                 same_as<remove_cvref<range_reference<R>>, Element>                &&
                 allocator_value_constructible_from<Allocator, range_reference<R>>
