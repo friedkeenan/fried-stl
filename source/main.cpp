@@ -149,8 +149,8 @@ int main(int argc, char **argv) {
 
     static_assert(frd::subrange(fuck.begin(), fuck.end()).size() == 2);
 
-    for (const auto i : frd::interval(5) | frd::views::reverse | frd::views::iterators) {
-        std::printf("%d\n", *i);
+    for (const auto i : fuck | frd::views::reverse | frd::views::repeat(3) | frd::views::repeat(2)) {
+        std::printf("repeat %d\n", i);
     }
 
     return 0;

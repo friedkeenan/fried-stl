@@ -58,6 +58,10 @@ namespace frd {
         struct pointer_traits {
             using pointer = Ptr;
 
+            /*
+                NOTE: If 'Ptr' is not a template specialization,
+                'first_template_arg<Ptr>' is an incomplete type.
+            */
             ATTR_ELSE(Ptr, element_type,    first_template_arg<Ptr>);
             ATTR_ELSE(Ptr, difference_type, ptrdiff_t);
 
@@ -88,12 +92,12 @@ namespace frd {
             using allocator_type = Allocator;
             using value_type     = typename Allocator::value_type;
 
-            ATTR_ELSE(Allocator, pointer,                                 value_type *);
-            ATTR_ELSE(Allocator, const_pointer,                           typename pointer_traits<pointer>::template rebind<const value_type>);
-            ATTR_ELSE(Allocator, void_pointer,                            typename pointer_traits<pointer>::template rebind<void>);
-            ATTR_ELSE(Allocator, const_void_pointer,                      typename pointer_traits<pointer>::template rebind<const void>);
-            ATTR_ELSE(Allocator, difference_type,                         typename pointer_traits<pointer>::difference_type);
-            ATTR_ELSE(Allocator, size_type,                               make_unsigned<difference_type>);
+            ATTR_ELSE(Allocator, pointer,            value_type *);
+            ATTR_ELSE(Allocator, const_pointer,      typename pointer_traits<pointer>::template rebind<const value_type>);
+            ATTR_ELSE(Allocator, void_pointer,       typename pointer_traits<pointer>::template rebind<void>);
+            ATTR_ELSE(Allocator, const_void_pointer, typename pointer_traits<pointer>::template rebind<const void>);
+            ATTR_ELSE(Allocator, difference_type,    typename pointer_traits<pointer>::difference_type);
+            ATTR_ELSE(Allocator, size_type,          make_unsigned<difference_type>);
 
             #define ATTR_ELSE_VALUE(name)                                               \
                 template<typename U> using _##name##_impl = typename U::name;           \
@@ -294,9 +298,14 @@ namespace frd {
     }
 
     template<typename Ptr>
-    concept _pointer_traits_to_address = requires(const Ptr &ptr) {
-        std::pointer_traits<Ptr>::to_address(ptr);
-    };
+    concept _pointer_traits_to_address = (
+        requires { typename Ptr::element_type; } ||
+        !incomplete<first_template_arg<Ptr>>
+    ) && (
+        requires(const Ptr &ptr) {
+            std::pointer_traits<Ptr>::to_address(ptr);
+        }
+    );
 
     template<typename Ptr>
     concept _arrow_dereferenceable_to_address = requires(const Ptr &ptr) {
