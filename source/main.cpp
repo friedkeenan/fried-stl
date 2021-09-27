@@ -90,6 +90,7 @@ consteval bool fuck() {
     v.insert(v.end(), S(true));
 
     v.insert(v.end(), frd::array{S(false), S(true)});
+    v.insert(v.end(), {S(false), S(true)});
 
     return v[0].value && !v[1].value && v[2].value && v.back().value && v.capacity() == 8;
 }

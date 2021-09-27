@@ -127,7 +127,7 @@ namespace frd {
                 this->emplace_back(frd::forward<ElementFwd>(obj));
             }
 
-            constexpr void _reserve_insert_impl(const const_iterator pos_to_insert, const size_type new_capacity, const size_type insert_size) {
+            constexpr void _reserve_for_insertion(const size_type new_capacity, const const_iterator pos_to_insert, const size_type insert_size) {
                 /* Do our own reserve so we don't move our elements more than we need to. */
 
                 const auto new_data = _allocator_traits::allocate(this->_allocator, new_capacity);
@@ -164,27 +164,36 @@ namespace frd {
                 }
             }
 
-            template<typename... Args>
-            requires (allocator_value_constructible_from<Allocator, Args...>)
-            constexpr iterator emplace(const const_iterator pos, Args &&... args) {
-                const auto emplace_offset = pos - this->begin();
+            [[nodiscard]]
+            constexpr iterator _make_space_for_insertion(const const_iterator pos, const size_type insert_size) {
+                const auto insert_offset = pos - this->begin();
 
                 if (this->_capacity == 0) {
                     /* Use '_reserve_impl' to avoid capacity checks. */
 
-                    this->_reserve_impl(1);
-                } else if (this->_size + 1 > this->_capacity) {
-                    this->_reserve_insert_impl(pos, NewCapacityRatio * this->_capacity, 1);
+                    this->_reserve_impl(insert_size);
+                } else if (this->_size + insert_size > this->_capacity) {
+                    this->_reserve_for_insertion(NewCapacityRatio * this->_capacity, pos, insert_size);
                 } else if (!this->empty()) {
                     /* We do not need to move anything if we're empty. */
 
-                    this->_shift_elements(this->_to_mutable_iterator(pos), 1);
+                    this->_shift_elements(this->_to_mutable_iterator(pos), insert_size);
                 }
 
-                _allocator_traits::construct(this->_allocator, this->_data + emplace_offset, frd::forward<Args>(args)...);
+                /* Need to get new iterator as iterators may be invalidated. */
+                return this->begin() + insert_offset;
+            }
+
+            template<typename... Args>
+            requires (allocator_value_constructible_from<Allocator, Args...>)
+            constexpr iterator emplace(const const_iterator pos, Args &&... args) {
+                const auto insert_it = this->_make_space_for_insertion(pos, 1);
+
+                /* Emplace the element into the empty location we have made for it. */
+                _allocator_traits::construct(this->_allocator, pointer{insert_it}, frd::forward<Args>(args)...);
                 this->_size++;
 
-                return this->begin() + emplace_offset;
+                return insert_it;
             }
 
             template<forwarder_for<Element> ElementFwd>
@@ -200,23 +209,15 @@ namespace frd {
             template<typename R>
             /* Requirements checked by callers. */
             constexpr iterator _insert_range(const const_iterator pos, R &&insert_rng) {
-                const auto insert_size   = frd::size(insert_rng);
-                const auto insert_offset = pos - this->begin();
+                const auto insert_size = frd::size(insert_rng);
+                const auto insert_it   = this->_make_space_for_insertion(pos, insert_size);
 
-                if (this->_capacity == 0) {
-                    /* Use '_reserve_impl' to avoid capacity checks. */
+                /*
+                    Insert the elements of the range into the empty locations we have made for it.
 
-                    this->_reserve_impl(insert_size);
-                } else if (this->_size + insert_size > this->_capacity) {
-                    this->_reserve_insert_impl(pos, NewCapacityRatio * this->_capacity, insert_size);
-                } else if (!this->empty()) {
-                    /* We do not need to move anything if we're empty. */
-
-                    this->_shift_elements(this->_to_mutable_iterator(pos), insert_size);
-                }
-
-                /* Insert the elements of the range into the empty locations we have made for it. */
-                auto insert_location = this->_data + insert_offset;
+                    TODO: enumerate might be better here.
+                */
+                auto insert_location = pointer{insert_it};
                 for (auto &&to_insert : insert_rng) {
                     _allocator_traits::construct(this->_allocator, insert_location, frd::forward<decltype(to_insert)>(to_insert));
 
@@ -225,7 +226,7 @@ namespace frd {
 
                 this->_size += insert_size;
 
-                return this->begin() + insert_offset;
+                return insert_it;
             }
 
             constexpr iterator insert(const const_iterator pos, const std::initializer_list<Element> list) {
