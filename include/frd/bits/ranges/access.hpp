@@ -223,7 +223,7 @@ namespace frd {
 
     template<typename R>
     concept _member_size = !std::ranges::disable_sized_range<remove_cv<R>> && requires(R &&r) {
-        { frd::forward<R>(r).size() } -> integral;
+        { frd::forward<R>(r).size() } -> non_bool_integral;
     };
 
     namespace _adl {
@@ -235,7 +235,7 @@ namespace frd {
         template<typename R>
         concept _adl_size = !std::ranges::disable_sized_range<remove_cv<R>> && adl_discoverable<R> &&
             requires(R &&r) {
-                { frd::decay_copy(size(frd::forward<R>(r))) } -> integral;
+                { frd::decay_copy(size(frd::forward<R>(r))) } -> non_bool_integral;
             };
 
     }

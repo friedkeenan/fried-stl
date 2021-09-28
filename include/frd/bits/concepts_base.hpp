@@ -71,6 +71,9 @@ namespace frd {
     );
 
     template<typename T>
+    concept non_bool_integral = !same_as_without_cv<remove_signedness<T>, bool> && integral<T>;
+
+    template<typename T>
     concept floating_point = (
         same_as_without_cv<T, float>       ||
         same_as_without_cv<T, double>      ||
@@ -91,6 +94,12 @@ namespace frd {
 
     template<typename T>
     concept unsigned_integral = integral<T> && unsigned_type<T>;
+
+    template<typename T>
+    concept non_bool_signed_integral = non_bool_integral<T> && signed_type<T>;
+
+    template<typename T>
+    concept non_bool_unsigned_integral = non_bool_integral<T> && unsigned_type<T>;
 
     template<typename T>
     concept lvalue_reference = is_lvalue_reference<T>;

@@ -3,6 +3,9 @@
 #include <climits>
 #include <cfloat>
 
+#include <limits>
+
+#include <frd/platform.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 
@@ -37,6 +40,13 @@ namespace frd {
     NUMERIC_LIMITS(float,              FLT_MIN,   FLT_MAX);
     NUMERIC_LIMITS(double,             DBL_MIN,   DBL_MAX);
     NUMERIC_LIMITS(long double,        LDBL_MIN,  LDBL_MAX);
+
+    #if FRD_PLATFORM_HAS_INT_128
+
+    FRD_PLATFORM_USES_EXTENSION NUMERIC_LIMITS(         __int128, std::numeric_limits<__int128>::min(), std::numeric_limits<         __int128>::max());
+    FRD_PLATFORM_USES_EXTENSION NUMERIC_LIMITS(unsigned __int128, 0,                                    std::numeric_limits<unsigned __int128>::max());
+
+    #endif
 
     #undef NUMERIC_LIMITS
 

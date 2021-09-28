@@ -350,7 +350,7 @@ namespace frd {
     template<typename It>
     concept weakly_incrementable = movable<It> && requires(It it) {
         typename iter_difference<It>;
-        requires signed_integral<iter_difference<It>>;
+        requires non_bool_signed_integral<iter_difference<It>>;
 
         { ++it } -> same_as<It &>;
         it++;
@@ -364,7 +364,7 @@ namespace frd {
     template<typename It>
     concept weakly_decrementable = movable<It> && requires(It it) {
         typename iter_difference<It>;
-        requires signed_integral<iter_difference<It>>;
+        requires non_bool_signed_integral<iter_difference<It>>;
 
         { --it } -> same_as<It &>;
         it--;
