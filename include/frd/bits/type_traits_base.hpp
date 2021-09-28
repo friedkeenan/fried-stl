@@ -5,6 +5,7 @@
 #include <frd/bits/arithmetic_base.hpp>
 
 #include <frd/defines.hpp>
+#include <frd/platform.hpp>
 
 namespace frd {
 
@@ -265,14 +266,20 @@ namespace frd {
     template<typename T> struct _remove_unsigned : type_holder<T> { };
 
     #define REMOVE_SIGNEDNESS(cls)                                               \
-        template<> struct _remove_signed  <signed   cls> : type_holder<cls> { }; \
-        template<> struct _remove_unsigned<unsigned cls> : type_holder<cls> { }
+        FRD_PLATFORM_USES_EXTENSION template<> struct _remove_signed  <signed   cls> : type_holder<cls> { }; \
+        FRD_PLATFORM_USES_EXTENSION template<> struct _remove_unsigned<unsigned cls> : type_holder<cls> { }
 
     REMOVE_SIGNEDNESS(char);
     REMOVE_SIGNEDNESS(short);
     REMOVE_SIGNEDNESS(int);
     REMOVE_SIGNEDNESS(long);
     REMOVE_SIGNEDNESS(long long);
+
+    #if FRD_PLATFORM_HAS_INT_128
+
+    REMOVE_SIGNEDNESS(__int128);
+
+    #endif
 
     #undef REMOVE_SIGNEDNESS
 
@@ -289,8 +296,8 @@ namespace frd {
     template<typename T> struct _make_unsigned : type_holder<T> { };
 
     #define ADD_SIGNEDNESS(cls)                                                \
-        template<> struct _make_signed  <cls> : type_holder<  signed cls> { }; \
-        template<> struct _make_unsigned<cls> : type_holder<unsigned cls> { }
+        FRD_PLATFORM_USES_EXTENSION template<> struct _make_signed  <cls> : type_holder<  signed cls> { }; \
+        FRD_PLATFORM_USES_EXTENSION template<> struct _make_unsigned<cls> : type_holder<unsigned cls> { }
 
     ADD_SIGNEDNESS(char);
     ADD_SIGNEDNESS(short);
@@ -298,8 +305,15 @@ namespace frd {
     ADD_SIGNEDNESS(long);
     ADD_SIGNEDNESS(long long);
 
+    #if FRD_PLATFORM_HAS_INT_128
+
+    ADD_SIGNEDNESS(__int128);
+
+    #endif
+
     #undef ADD_SIGNEDNESS
 
+    FRD_PLATFORM_USES_EXTENSION
     template<typename T>
     using _ranked_int_with_same_size = type_with_size<sizeof(T),
         signed char,
@@ -307,8 +321,16 @@ namespace frd {
         signed int,
         signed long,
         signed long long
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        /* Add comma for previous item. */
+        , __int128
+
+        #endif
     >;
 
+    FRD_PLATFORM_USES_EXTENSION
     template<typename T>
     using _ranked_uint_with_same_size = type_with_size<sizeof(T),
         unsigned char,
@@ -316,6 +338,13 @@ namespace frd {
         unsigned int,
         unsigned long,
         unsigned long long
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        /* Add comma for previous item. */
+        , unsigned __int128
+
+        #endif
     >;
 
     template<typename T> requires (is_enum<T>) struct _make_signed<T>   : type_holder<_ranked_int_with_same_size <T>> { };

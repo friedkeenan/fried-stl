@@ -344,7 +344,7 @@ namespace frd {
                 } else {
                     this->reserve(new_size);
 
-                    for(const auto i : interval(this->_size, new_size)) {
+                    for (const auto i : interval(this->_size, new_size)) {
                         _allocator_traits::construct(this->_allocator, this->_data + i, value);
                     }
                 }

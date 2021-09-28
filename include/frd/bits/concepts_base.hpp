@@ -48,6 +48,7 @@ namespace frd {
         { !forward<B>(b) } -> convertible_to<bool>;
     };
 
+    FRD_PLATFORM_USES_EXTENSION
     template<typename T>
     concept integral = (
         same_as_without_cv<remove_signedness<T>, bool>      ||
@@ -60,6 +61,13 @@ namespace frd {
         same_as_without_cv<remove_signedness<T>, int>       ||
         same_as_without_cv<remove_signedness<T>, long>      ||
         same_as_without_cv<remove_signedness<T>, long long>
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        /* Add '||' for previous item. */
+        || same_as_without_cv<remove_signedness<T>, __int128>
+
+        #endif
     );
 
     template<typename T>

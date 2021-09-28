@@ -29,6 +29,17 @@
 
 #endif
 
+#define FRD_PLATFORM_HAS_INT_128 false
+
+#if defined(__SIZEOF_INT128__)
+
+#undef  FRD_PLATFORM_HAS_INT_128
+#define FRD_PLATFORM_HAS_INT_128 true
+
+#endif
+
+#define FRD_PLATFORM_USES_EXTENSION __extension__
+
 namespace frd::platform {
 
     consteval bool gcc() {
@@ -37,6 +48,10 @@ namespace frd::platform {
 
     consteval bool clang() {
         return FRD_PLATFORM_CLANG;
+    }
+
+    consteval bool has_int128() {
+        return FRD_PLATFORM_HAS_INT_128;
     }
 
 }

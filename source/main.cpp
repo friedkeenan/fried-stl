@@ -18,6 +18,7 @@ static_assert(sizeof(frd::int8_t)    == 1);
 static_assert(sizeof(frd::int16_t)   == 2);
 static_assert(sizeof(frd::int32_t)   == 4);
 static_assert(sizeof(frd::int64_t)   == 8);
+static_assert(sizeof(frd::int128_t)  == 16);
 static_assert(sizeof(frd::ptrdiff_t) == 8);
 
 static_assert(frd::same_as<frd::ptrdiff_t, frd::int64_t>);
@@ -63,6 +64,10 @@ static_assert(frd::_adl::_adl_swap<frd::unique_ptr<int> &, frd::unique_ptr<int> 
 static_assert(frd::nothrow_swappable<frd::unique_ptr<int> &>);
 
 static_assert(!frd::contiguous_iterator<frd::reverse_iterator<int *>>);
+
+FRD_PLATFORM_USES_EXTENSION static_assert(frd::integral<unsigned __int128>);
+
+static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 
 consteval bool fuck() {
     struct S {

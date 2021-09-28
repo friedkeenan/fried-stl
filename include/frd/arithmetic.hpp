@@ -3,12 +3,14 @@
 #include <frd/bits/arithmetic_base.hpp>
 
 #include <frd/defines.hpp>
+#include <frd/platform.hpp>
 #include <frd/functional.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>
 
 namespace frd {
 
+    FRD_PLATFORM_USES_EXTENSION
     template<frd::size_t BitSize, auto Operator = equal_to>
     using int_for_bit_size = type_for_bit_size<BitSize, Operator,
         signed char,
@@ -16,8 +18,16 @@ namespace frd {
         signed int,
         signed long,
         signed long long
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        /* Add comma for previous item. */
+        , __int128
+
+        #endif
     >;
 
+    FRD_PLATFORM_USES_EXTENSION
     template<frd::size_t BitSize, auto Operator = equal_to>
     using uint_for_bit_size = type_for_bit_size<BitSize, Operator,
         unsigned char,
@@ -25,6 +35,13 @@ namespace frd {
         unsigned int,
         unsigned long,
         unsigned long long
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        /* Add comma for previous item. */
+        , unsigned __int128
+
+        #endif
     >;
 
     template<frd::size_t BitSize> using  int_fits_bit_size =  int_for_bit_size<BitSize, greater_equal>;
@@ -50,6 +67,12 @@ namespace frd {
     DECLARE_INTS(16);
     DECLARE_INTS(32);
     DECLARE_INTS(64);
+
+    #if FRD_PLATFORM_HAS_INT_128
+
+    DECLARE_INTS(128);
+
+    #endif
 
     #undef DECLARE_INTS
 
@@ -77,6 +100,13 @@ namespace frd {
         INTEGRAL_LITERAL(frd::uint32_t, u32)
         INTEGRAL_LITERAL(frd::int64_t,  i64)
         INTEGRAL_LITERAL(frd::uint64_t, u64)
+
+        #if FRD_PLATFORM_HAS_INT_128
+
+        INTEGRAL_LITERAL(frd::int128_t,  i128)
+        INTEGRAL_LITERAL(frd::uint128_t, u128)
+
+        #endif
 
         #undef INTEGRAL_LITERAL
 
