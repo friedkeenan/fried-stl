@@ -76,6 +76,9 @@ namespace frd {
     template<typename T>
     constexpr inline bool is_enum = std::is_enum_v<T>;
 
+    template<typename T>
+    constexpr inline bool is_union = std::is_union_v<T>;
+
     /* Only operations on types below. */
 
     template<typename T>

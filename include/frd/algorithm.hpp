@@ -21,6 +21,21 @@ namespace frd {
         }
     }
 
+    template<less_than_comparable T, same_as<T>... Rest>
+    constexpr T max(const T &first, const Rest &... rest) noexcept {
+        if constexpr (sizeof...(Rest) == 0) {
+            return first;
+        } else {
+            const auto rest_max = max(rest...);
+
+            if (first < rest_max) {
+                return rest_max;
+            }
+
+            return first;
+        }
+    }
+
     template<typename In, typename Out>
     struct in_out_result {
         [[no_unique_address]] In  in;

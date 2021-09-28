@@ -90,9 +90,13 @@ consteval bool fuck() {
     v.insert(v.end(), S(true));
 
     v.insert(v.end(), frd::array{S(false), S(true)});
-    v.insert(v.end(), {S(false), S(true)});
 
-    return v[0].value && !v[1].value && v[2].value && v.back().value && v.capacity() == 8;
+    const auto it = v.insert(v.end(), {S(false), S(true)}) + 1;
+    it->value = false;
+
+    v.insert(v.end(), 500, S(false));
+
+    return v[0].value && !v[1].value && v[2].value && !v[6].value && v.capacity() == 507;
 }
 
 static_assert(fuck());
@@ -152,6 +156,11 @@ int main(int argc, char **argv) {
     for (const auto i : fuck | frd::views::reverse | frd::views::repeat(3) | frd::views::repeat(2)) {
         std::printf("repeat %d\n", i);
     }
+
+    frd::overloaded{
+        [](const int    x) { std::printf("%d\n",   x); },
+        [](const double x) { std::printf("%.3f\n", x); },
+    }(5.0);
 
     return 0;
 }

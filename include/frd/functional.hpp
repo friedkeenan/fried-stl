@@ -256,4 +256,11 @@ namespace frd {
         );
     }
 
+    template<inheritable... Callables>
+    struct overloaded : public Callables... {
+        /* Constructor and deduction guide are implicitly defined. */
+
+        using Callables::operator ()...;
+    };
+
 }

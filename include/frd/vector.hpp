@@ -10,7 +10,11 @@
 
 namespace frd {
 
-    /* TODO: Decide whether to do vector<bool> specialization. */
+    /*
+        TODO: Decide whether to do vector<bool> specialization.
+
+        NOTE: We currently do not have strong exception guarantees.
+    */
 
     template<typename Element, allocator_for<Element> Allocator = allocator<Element>>
     requires (copy_assignable<Element> && copy_constructible<Element>)
@@ -29,6 +33,9 @@ namespace frd {
             using const_iterator  = const_pointer;
             using difference_type = iter_difference<iterator>;
             using size_type       = make_unsigned<difference_type>;
+
+            using reverse_iterator       = frd::reverse_iterator<iterator>;
+            using const_reverse_iterator = frd::reverse_iterator<const_iterator>;
 
             static constexpr size_type IterDifferenceMax = numeric_limits<difference_type>::max;
 
@@ -173,7 +180,10 @@ namespace frd {
 
                     this->_reserve_impl(insert_size);
                 } else if (this->_size + insert_size > this->_capacity) {
-                    this->_reserve_for_insertion(NewCapacityRatio * this->_capacity, pos, insert_size);
+                    /* The normal exponential reallocation could still be too small for the insertion. */
+                    const auto new_capacity = frd::max(NewCapacityRatio * this->_capacity, insert_size + this->_size);
+
+                    this->_reserve_for_insertion(new_capacity, pos, insert_size);
                 } else if (!this->empty()) {
                     /* We do not need to move anything if we're empty. */
 
@@ -201,6 +211,19 @@ namespace frd {
                 return this->emplace(pos, frd::forward<ElementFwd>(obj));
             }
 
+            constexpr iterator insert(const const_iterator pos, const size_type count, const Element &value) {
+                const auto insert_it = this->_make_space_for_insertion(pos, count);
+
+                /* Copy the value into the spaces we have made for it. */
+                for (const auto i : interval(count)) {
+                    _allocator_traits::construct(this->_allocator, pointer{insert_it + i}, value);
+                }
+
+                this->_size += count;
+
+                return insert_it;
+            }
+
             /*
                 We need this bit of indirection to allow brace-enclosed initializer
                 lists to be deduced to 'std::initializer_list', as the compiler will
@@ -215,7 +238,7 @@ namespace frd {
                 /*
                     Insert the elements of the range into the empty locations we have made for it.
 
-                    TODO: enumerate might be better here.
+                    TODO: 'enumerate' might be better here.
                 */
                 auto insert_location = pointer{insert_it};
                 for (auto &&to_insert : insert_rng) {
@@ -380,18 +403,18 @@ namespace frd {
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<iterator> rbegin() noexcept {
+            constexpr reverse_iterator rbegin() noexcept {
                 return reverse_iterator(this->end());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> rbegin() const noexcept {
-                return reverse_iterator(this->end());
+            constexpr const_reverse_iterator rbegin() const noexcept {
+                return const_reverse_iterator(this->end());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> crbegin() const noexcept {
-                return reverse_iterator(this->cend());
+            constexpr const_reverse_iterator crbegin() const noexcept {
+                return const_reverse_iterator(this->cend());
             }
 
             [[nodiscard]]
@@ -410,18 +433,18 @@ namespace frd {
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<iterator> rend() noexcept {
+            constexpr reverse_iterator rend() noexcept {
                 return reverse_iterator(this->begin());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> rend() const noexcept {
-                return reverse_iterator(this->begin());
+            constexpr const_reverse_iterator rend() const noexcept {
+                return const_reverse_iterator(this->begin());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> crend() const noexcept {
-                return reverse_iterator(this->cbegin());
+            constexpr const_reverse_iterator crend() const noexcept {
+                return const_reverse_iterator(this->cbegin());
             }
 
             [[nodiscard]]

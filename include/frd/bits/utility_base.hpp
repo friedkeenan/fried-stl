@@ -53,7 +53,7 @@ namespace frd {
     };
 
     [[noreturn]]
-    inline void unreachable(const _dummy_compile_time_str msg = {}) {
+    inline void unreachable(const _dummy_compile_time_str msg = {}) noexcept {
         FRD_UNUSED(msg);
 
         /* Here we can have different implementations for unreachable code. */

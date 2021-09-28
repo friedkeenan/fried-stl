@@ -20,10 +20,13 @@ namespace frd {
             using reference       = Element &;
             using const_reference = const Element &;
 
-            using size_type       = frd::size_t;
-            using difference_type = frd::ptrdiff_t;
             using iterator        = pointer;
             using const_iterator  = const_pointer;
+            using difference_type = frd::ptrdiff_t;
+            using size_type       = frd::size_t;
+
+            using reverse_iterator       = frd::reverse_iterator<iterator>;
+            using const_reverse_iterator = frd::reverse_iterator<const_iterator>;
 
             Element _elems[Size];
 
@@ -93,18 +96,18 @@ namespace frd {
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<iterator> rbegin() noexcept {
+            constexpr reverse_iterator rbegin() noexcept {
                 return reverse_iterator(this->end());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> rbegin() const noexcept {
-                return reverse_iterator(this->end());
+            constexpr const_reverse_iterator rbegin() const noexcept {
+                return const_reverse_iterator(this->end());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> crbegin() const noexcept {
-                return reverse_iterator(this->cend());
+            constexpr const_reverse_iterator crbegin() const noexcept {
+                return const_reverse_iterator(this->cend());
             }
 
             constexpr iterator end() noexcept {
@@ -120,18 +123,18 @@ namespace frd {
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<iterator> rend() noexcept {
+            constexpr reverse_iterator rend() noexcept {
                 return reverse_iterator(this->begin());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> rend() const noexcept {
-                return reverse_iterator(this->begin());
+            constexpr const_reverse_iterator rend() const noexcept {
+                return const_reverse_iterator(this->begin());
             }
 
             [[nodiscard]]
-            constexpr reverse_iterator<const_iterator> crend() const noexcept {
-                return reverse_iterator(this->cbegin());
+            constexpr const_reverse_iterator crend() const noexcept {
+                return const_reverse_iterator(this->cbegin());
             }
 
 
@@ -191,6 +194,7 @@ namespace frd {
             }
     };
 
+    /* Deduction guide for the implicitly declared constructor. */
     template<typename Head, typename... Rest>
     array(Head, Rest...) -> array<Head, sizeof...(Rest) + 1>;
 

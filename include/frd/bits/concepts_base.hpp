@@ -148,6 +148,15 @@ namespace frd {
     };
 
     template<typename T>
+    concept union_type = class_type<T> && is_union<T>;
+
+    template<typename T>
+    concept non_union_class = class_type<T> && !union_type<T>;
+
+    template<typename T>
+    concept inheritable = non_union_class<T>;
+
+    template<typename T>
     concept adl_discoverable = class_type<remove_cvref<T>> || enum_type<remove_cvref<T>>;
 
     template<typename T>
