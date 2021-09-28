@@ -173,6 +173,8 @@ namespace frd {
 
             [[nodiscard]]
             constexpr iterator _make_space_for_insertion(const const_iterator pos, const size_type insert_size) {
+                FRD_ASSERT(pos >= this->begin() && pos <= this->end(), "Invalid iterator for insertion!");
+
                 const auto insert_offset = pos - this->begin();
 
                 if (this->_capacity == 0) {
@@ -181,11 +183,19 @@ namespace frd {
                     this->_reserve_impl(insert_size);
                 } else if (this->_size + insert_size > this->_capacity) {
                     /* The normal exponential reallocation could still be too small for the insertion. */
-                    const auto new_capacity = frd::max(NewCapacityRatio * this->_capacity, insert_size + this->_size);
+                    const auto new_capacity = frd::max(NewCapacityRatio * this->_capacity, this->_size + insert_size);
 
                     this->_reserve_for_insertion(new_capacity, pos, insert_size);
                 } else if (!this->empty()) {
-                    /* We do not need to move anything if we're empty. */
+                    /*
+                        We don't need to move anything if we're empty.
+
+                        NOTE: We don't *need* to check if we're empty, as
+                        '_shift_elements' will do nothing if the vector is
+                        empty, but I find explicitly checking it to be more
+                        expressive, and saves us from the extra logic that
+                        '_shift_elements' would do.
+                    */
 
                     this->_shift_elements(this->_to_mutable_iterator(pos), insert_size);
                 }
