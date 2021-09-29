@@ -299,9 +299,13 @@ namespace frd {
 
     template<typename Ptr>
     concept _pointer_traits_to_address = (
+        /* Check first that 'std::pointer_traits<Ptr>' is well-formed. */
+
         requires { typename Ptr::element_type; } ||
         !incomplete<first_template_arg<Ptr>>
     ) && (
+        /* Next check that 'std::pointer_traits<Ptr>' has a 'to_address' static member function. */
+
         requires(const Ptr &ptr) {
             std::pointer_traits<Ptr>::to_address(ptr);
         }
@@ -319,7 +323,7 @@ namespace frd {
         if constexpr (_pointer_traits_to_address<Ptr>) {
             return std::pointer_traits<Ptr>::to_address(ptr);
         } else {
-            return to_address(ptr.operator ->());
+            return frd::to_address(ptr.operator ->());
         }
     }
 

@@ -25,10 +25,10 @@ namespace frd {
         [[no_unique_address]] Fn _fn;
         [[no_unique_address]] frd::tuple<BoundArgs...> _bound_args;
 
-        /* Add leading dummy 'int' argument to avoid ambiguity with copy/move constructors. */
+        /* Add leading dummy 'not_copy_move_tag_t' argument to avoid ambiguity with copy/move constructors. */
         template<typename FnOther, typename... BoundArgsOther>
         requires (constructible_from<Fn, FnOther> && (constructible_from<BoundArgs, BoundArgsOther> && ...))
-        constexpr _bind_front_back_impl(int, FnOther &&fn, BoundArgsOther &&... bound_args)
+        constexpr _bind_front_back_impl(not_copy_move_tag_t, FnOther &&fn, BoundArgsOther &&... bound_args)
         noexcept(
             nothrow_constructible_from<Fn, FnOther> && (nothrow_constructible_from<BoundArgs, BoundArgsOther> && ...)
         )
@@ -104,10 +104,18 @@ namespace frd {
     template<typename Fn, typename... BoundArgs>
     constexpr _bind_front_fn_with_decay<Fn, BoundArgs...> bind_front(Fn &&fn, BoundArgs &&... bound_args)
     noexcept(
-        nothrow_constructible_from<_bind_front_fn_with_decay<Fn, BoundArgs...>, int, Fn, BoundArgs...>
+        nothrow_constructible_from<
+            _bind_front_fn_with_decay<Fn, BoundArgs...>,
+
+            not_copy_move_tag_t,
+
+            Fn,
+            BoundArgs...
+        >
     ) {
         return _bind_front_fn_with_decay<Fn, BoundArgs...>(
-            0,
+            not_copy_move_tag,
+
             frd::forward<Fn>(fn),
             frd::forward<BoundArgs>(bound_args)...
         );
@@ -145,10 +153,18 @@ namespace frd {
     template<typename Fn, typename... BoundArgs>
     constexpr _bind_back_fn_with_decay<Fn, BoundArgs...> bind_back(Fn &&fn, BoundArgs &&... bound_args)
     noexcept(
-        nothrow_constructible_from<_bind_back_fn_with_decay<Fn, BoundArgs...>, int, Fn, BoundArgs...>
+        nothrow_constructible_from<
+            _bind_back_fn_with_decay<Fn, BoundArgs...>,
+
+            not_copy_move_tag_t,
+
+            Fn,
+            BoundArgs...
+        >
     ) {
         return _bind_back_fn_with_decay<Fn, BoundArgs...>(
-            0,
+            not_copy_move_tag,
+
             frd::forward<Fn>(fn),
             frd::forward<BoundArgs>(bound_args)...
         );

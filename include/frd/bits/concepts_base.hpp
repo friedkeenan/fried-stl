@@ -9,7 +9,17 @@
 namespace frd {
 
     template<typename T, typename U>
-    concept same_as = is_same<T, U>;
+    concept _same_as = is_same<T, U>;
+
+    /*
+        NOTE: The standard says 'same_as<T, U>' subsumes 'same_as<U, T>',
+        and mandates this reflexive expression.
+
+        I believe this is for when determining which concept is more
+        constrained than another for the purpose of overload resolution.
+    */
+    template<typename T, typename U>
+    concept same_as = _same_as<T, U> && _same_as<U, T>;
 
     template<typename T, typename U>
     concept same_as_without_cv = same_as<remove_cv<T>, remove_cv<U>>;
@@ -28,8 +38,9 @@ namespace frd {
     template<typename From, typename To>
     concept convertible_to = (
         implicitly_convertible_to<From, To> &&
-        requires(add_rvalue_reference<From> (&func)()) {
-            static_cast<To>(func());
+
+        requires {
+            static_cast<To>(frd::declval<From>());
         }
     );
 
@@ -224,12 +235,12 @@ namespace frd {
         ) &&
         (
             reference<T> ||
-            (
-                requires(T &t) {
-                    t.~T();
-                } &&
-                noexcept(declval<T &>().~T())
-            )
+
+            requires(T &t) {
+                t.~T();
+
+                requires noexcept(t.~T());
+            }
         );
 
     template<typename T, typename... Args>

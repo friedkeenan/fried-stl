@@ -180,7 +180,7 @@ namespace frd {
     };
 
     template<typename... ElementHolders>
-    struct _aggregate_tuple_element_holders : ElementHolders... {
+    struct _combine_tuple_element_holders : ElementHolders... {
         /*
             Combine all the element holders and pull in their
             'get' methods to participate in overload resolution.
@@ -194,7 +194,7 @@ namespace frd {
 
     template<frd::size_t... Indices, typename... Elements>
     struct _make_tuple_base<frd::index_sequence<Indices...>, Elements...> {
-        using type = _aggregate_tuple_element_holders<_tuple_element_holder<Indices, Elements>...>;
+        using type = _combine_tuple_element_holders<_tuple_element_holder<Indices, Elements>...>;
     };
 
     template<typename... Elements>

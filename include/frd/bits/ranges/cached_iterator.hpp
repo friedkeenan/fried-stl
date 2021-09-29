@@ -96,7 +96,7 @@ namespace frd {
         }
 
         [[nodiscard]]
-        constexpr bool has_value() const {
+        constexpr bool has_value() const noexcept {
             return this->_initialized;
         }
 
@@ -152,7 +152,7 @@ namespace frd {
         }
 
         [[nodiscard]]
-        constexpr bool has_value() const {
+        constexpr bool has_value() const noexcept {
             return this->_offset >= 0;
         }
 

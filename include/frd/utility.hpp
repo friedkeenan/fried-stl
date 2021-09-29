@@ -164,4 +164,9 @@ namespace frd {
     template<frd::size_t N>
     using make_index_sequence = std::make_integer_sequence<frd::size_t, N>;
 
+    /* An argument passed to remove ambiguity with copy/move constructors. */
+    struct not_copy_move_tag_t { };
+
+    constexpr inline not_copy_move_tag_t not_copy_move_tag{};
+
 }
