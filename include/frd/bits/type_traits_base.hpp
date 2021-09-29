@@ -43,7 +43,8 @@ namespace frd {
     using false_holder = constant_holder<false>;
     using true_holder  = constant_holder<true>;
 
-    template<typename Head, typename... Tail> constexpr inline bool dependent_false = false;
+    template<typename Head, typename... Tail>
+    constexpr inline bool dependent_false = false;
 
     template<typename T, typename U> constexpr inline bool is_same       = false;
     template<typename T>             constexpr inline bool is_same<T, T> = true;

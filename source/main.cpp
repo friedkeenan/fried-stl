@@ -69,6 +69,21 @@ FRD_PLATFORM_USES_EXTENSION static_assert(frd::integral<unsigned __int128>);
 
 static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 
+static_assert(frd::tuple_like<frd::tuple<int>>);
+static_assert(frd::pair_like<frd::subrange<int *>>);
+
+static_assert(
+    frd::apply(
+        frd::overloaded{
+            [](const int                 ) { return 6;   },
+            [](const double              ) { return 9;   },
+            [](const frd::unique_ptr<int>) { return 420; },
+        },
+
+        frd::tuple{frd::make_unique<int>(5)}
+    ) == 420
+);
+
 consteval bool fuck() {
     struct S {
         bool value = false;
@@ -105,8 +120,6 @@ consteval bool fuck() {
 }
 
 static_assert(fuck());
-
-static_assert(frd::same_as<typename frd::unique_ptr<int>::element_type, int>);
 
 struct IntSentinel {
     constexpr bool operator ==(const int rhs) const noexcept {
@@ -161,11 +174,6 @@ int main(int argc, char **argv) {
     for (const auto i : fuck | frd::views::reverse | frd::views::repeat(3) | frd::views::repeat(2)) {
         std::printf("repeat %d\n", i);
     }
-
-    frd::overloaded{
-        [](const int    x) { std::printf("%d\n",   x); },
-        [](const double x) { std::printf("%.3f\n", x); },
-    }(5.0);
 
     return 0;
 }

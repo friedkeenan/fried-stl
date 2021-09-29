@@ -158,7 +158,7 @@ namespace frd {
                 this->_capacity = new_capacity;
             }
 
-            constexpr void _shift_elements(const iterator begin_shift, const size_type shift_size) {
+            constexpr void _shift_elements_forward(const iterator begin_shift, const size_type shift_size) {
                 /*
                     Loop starting from the end so we can just move each element over
                     without overwriting any other element.
@@ -191,13 +191,13 @@ namespace frd {
                         We don't need to move anything if we're empty.
 
                         NOTE: We don't *need* to check if we're empty, as
-                        '_shift_elements' will do nothing if the vector is
-                        empty, but I find explicitly checking it to be more
-                        expressive, and saves us from the extra logic that
-                        '_shift_elements' would do.
+                        '_shift_elements_forward' will do nothing if the
+                        vector is empty, but I find explicitly checking it
+                        to be more expressive, and saves us from the extra
+                        logic that '_shift_elements_forward' would do.
                     */
 
-                    this->_shift_elements(this->_to_mutable_iterator(pos), insert_size);
+                    this->_shift_elements_forward(this->_to_mutable_iterator(pos), insert_size);
                 }
 
                 /* Need to get new iterator as iterators may be invalidated. */

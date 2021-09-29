@@ -253,9 +253,10 @@ namespace frd {
 
     template<typename PairLike, typename T, typename U>
     concept _pair_like_convertible_from = (
-        !range<PairLike> &&
-        pair_like<PairLike> &&
-        constructible_from<PairLike, T, U> &&
+        !range<PairLike>                                          &&
+        !reference<PairLike>                                      &&
+        pair_like<remove_const<PairLike>>                         &&
+        constructible_from<PairLike, T, U>                        &&
         convertible_to_non_slicing<T, tuple_element<0, PairLike>> &&
         convertible_to<U, tuple_element<1, PairLike>>
     );

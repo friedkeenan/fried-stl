@@ -1,9 +1,9 @@
 #pragma once
 
-#include <memory>
 #include <tuple>
 
 #include <frd/bits/arithmetic_base.hpp>
+#include <frd/bits/functional_base.hpp>
 
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>
@@ -83,126 +83,190 @@ namespace frd {
     template<typename T, frd::size_t I = 0>
     concept nothrow_getable = getable<T, I> && noexcept(frd::get<I>(frd::declval<T>()));
 
+    template<typename TupleLike, typename Sequence>
+    inline bool _has_tuple_elements;
+
+    template<typename TupleLike, frd::size_t... Indices>
+    constexpr inline bool _has_tuple_elements<TupleLike, frd::index_sequence<Indices...>> = (
+        requires(TupleLike &&tuple_like) {
+            typename std::tuple_element<Indices, remove_reference<TupleLike>>::type;
+
+            frd::get<Indices>(frd::forward<TupleLike>(tuple_like));
+        } && ...
+    );
+
     template<typename T>
-    concept pair_like = !reference<T> && requires(T t) {
+    concept tuple_like = requires {
         std::tuple_size<T>::value;
-        requires tuple_size<T> == 2;
 
-        typename tuple_element<0, remove_const<T>>;
-        typename tuple_element<1, remove_const<T>>;
-
-        { frd::get<0>(t) } -> convertible_to<const tuple_element<0, T> &>;
-        { frd::get<1>(t) } -> convertible_to<const tuple_element<1, T> &>;
+        requires _has_tuple_elements<remove_reference<T>, frd::make_index_sequence<tuple_size<T>>>;
     };
 
-    template<typename... Ts>
-    class tuple;
+    template<typename T>
+    concept pair_like = tuple_like<T> && requires(T &&t) {
+        { frd::get<0>(frd::forward<T>(t)) } -> convertible_to<const tuple_element<0, remove_reference<T>> &>;
+        { frd::get<1>(frd::forward<T>(t)) } -> convertible_to<const tuple_element<1, remove_reference<T>> &>;
+    };
 
-    template<typename Head, typename... Tail>
-    class tuple<Head, Tail...> {
+    template<frd::size_t I, tuple_like TupleLike>
+    using forwarding_tuple_element = decltype(frd::get<I>(frd::declval<TupleLike>()));
+
+    template<typename TupleLike, typename Sequence>
+    struct _forwarding_tuple_elements;
+
+    template<typename TupleLike, frd::size_t... Indices>
+    struct _forwarding_tuple_elements<TupleLike, frd::index_sequence<Indices...>> {
+        using type = type_list<forwarding_tuple_element<Indices, TupleLike>...>;
+    };
+
+    template<tuple_like TupleLike>
+    using forwarding_tuple_elements = typename _forwarding_tuple_elements<TupleLike, frd::make_index_sequence<tuple_size<TupleLike>>>::type;
+
+    template<typename Invocable, typename TypeList>
+    inline bool _invocable_with_tuple_like;
+
+    template<typename Invocable, typename... Elements>
+    constexpr inline bool _invocable_with_tuple_like<Invocable, type_list<Elements...>> = invocable<Invocable, Elements...>;
+
+    template<typename Invocable, typename TupleLike, frd::size_t... Indices>
+    constexpr decltype(auto) _apply(Invocable &&invocable, TupleLike &&tuple_like, frd::index_sequence<Indices...>)
+    noexcept(
+        nothrow_invocable<Invocable, forwarding_tuple_element<Indices, TupleLike>...>
+    ) {
+        return frd::invoke(frd::forward<Invocable>(invocable), frd::get<Indices>(frd::forward<TupleLike>(tuple_like))...);
+    }
+
+    template<typename Invocable, tuple_like TupleLike>
+    requires (_invocable_with_tuple_like<Invocable, forwarding_tuple_elements<TupleLike>>)
+    constexpr decltype(auto) apply(Invocable &&invocable, TupleLike &&tuple_like)
+    noexcept(
+        noexcept(_apply(frd::forward<Invocable>(invocable), frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<tuple_size<TupleLike>>{}))
+    ) {
+        return _apply(frd::forward<Invocable>(invocable), frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<tuple_size<TupleLike>>{});
+    }
+
+    template<frd::size_t ElementIndex, typename Element>
+    struct _tuple_element_holder {
+        [[no_unique_address]] Element _elem;
+
+        /*
+            Require that 'I' equals our index, so that the correct 'get'
+            method will be called just through overload resolution.
+        */
+
+        template<frd::size_t I>
+        requires (I == ElementIndex)
+        constexpr Element &get() & noexcept {
+            return this->_elem;
+        }
+
+        template<frd::size_t I>
+        requires (I == ElementIndex)
+        constexpr const Element &get() const & noexcept {
+            return this->_elem;
+        }
+
+        template<frd::size_t I>
+        requires (I == ElementIndex)
+        constexpr Element &&get() && noexcept {
+            return frd::move(this->_elem);
+        }
+
+        template<frd::size_t I>
+        requires (I == ElementIndex)
+        constexpr const Element &&get() const && noexcept {
+            return frd::move(this->_elem);
+        }
+    };
+
+    template<typename... ElementHolders>
+    struct _aggregate_tuple_element_holders : ElementHolders... {
+        /*
+            Combine all the element holders and pull in their
+            'get' methods to participate in overload resolution.
+        */
+
+        using ElementHolders::get...;
+    };
+
+    template<typename Sequence, typename... Elements>
+    struct _make_tuple_base;
+
+    template<frd::size_t... Indices, typename... Elements>
+    struct _make_tuple_base<frd::index_sequence<Indices...>, Elements...> {
+        using type = _aggregate_tuple_element_holders<_tuple_element_holder<Indices, Elements>...>;
+    };
+
+    template<typename... Elements>
+    struct _tuple_base : _make_tuple_base<frd::make_index_sequence<sizeof...(Elements)>, Elements...>::type { };
+
+    /*
+        NOTE: The way we inherit from each base causes us to store
+        the first element before the second element before the third,
+        and so on. Both libstdc++ and libc++ store their elements in
+        the opposite order for 'std::tuple', but not for 'std::pair'.
+
+        Storing earlier elements earlier in the underlying data makes
+        more sense to me than the reverse, and as far as I can tell the
+        layout is not mandated by the standard, so we will keep it the way
+        it currently is.
+    */
+    template<typename... Elements>
+    class tuple : public _tuple_base<Elements...> {
         public:
-            template<typename CmpHead, typename... CmpTail>
+            /*
+                NOTE: All our special member functions are implicitly
+                defined, and therefore trivial if possible.
+            */
+
+            /* TODO: 'swap' method and assignment operator. */
+
+            template<typename... CmpElements>
             static consteval bool _is_comparable() {
                 return (
-                    sizeof...(Tail) == sizeof...(CmpTail)
-                ) && (
-                    synthetic_three_way_comparable_with<Head, CmpHead>
-                ) && ((
-                    synthetic_three_way_comparable_with<Tail, CmpTail>
-                ) && ...);
+                    (sizeof...(Elements) == sizeof...(CmpElements))                     &&
+                    (synthetic_three_way_comparable_with<Elements, CmpElements> && ...)
+                );
             }
 
+            /* All requirements and noexcept-ness handled by '<=>' operator. */
+            template<frd::size_t I, typename... RhsElements>
+            constexpr auto _compare_recurse(const tuple<RhsElements...> &rhs) const {
+                const auto cmp = frd::synthetic_three_way_compare(this->template get<I>(), rhs.template get<I>());
 
-            /*
-                NOTE: Both libstdc++ and libc++ store the tail elements
-                before the head element, but in 'pair' they store the
-                first element before the second. The layout doesn't seem
-                to be mandated by the standard, but it makes more sense
-                to me to store the head element before the tail elements.
-            */
-            [[no_unique_address]] Head _head;
-            [[no_unique_address]] tuple<Tail...> _tail;
+                if constexpr (I < sizeof...(Elements) - 1) {
+                    if (cmp != 0) {
+                        return cmp;
+                    }
 
-            constexpr tuple() = default;
-            constexpr tuple(const tuple &) = default;
-            constexpr tuple(tuple &&) = default;
-
-            constexpr tuple &operator =(const tuple &) = default;
-            constexpr tuple &operator =(tuple &&) = default;
-
-            template<typename HeadFwd, typename... TailFwd>
-            requires (sizeof...(TailFwd) == sizeof...(Tail))
-            constexpr explicit tuple(HeadFwd &&head, TailFwd &&... tail) : _head(frd::forward<HeadFwd>(head)), _tail(frd::forward<TailFwd>(tail)...) { }
-
-            /* TODO: 'swap' method. */
-
-            template<frd::size_t I>
-            constexpr decltype(auto) get() & noexcept {
-                if constexpr (I == 0) {
-                    return this->_head;
+                    return this->template _compare_recurse<I + 1>(rhs);
                 } else {
-                    return this->_tail.template get<I - 1>();
-                }
-            }
-
-            template<frd::size_t I>
-            constexpr decltype(auto) get() const & noexcept {
-                if constexpr (I == 0) {
-                    return this->_head;
-                } else {
-                    return this->_tail.template get<I - 1>();
-                }
-            }
-
-            template<frd::size_t I>
-            constexpr decltype(auto) get() && noexcept {
-                if constexpr (I == 0) {
-                    return frd::move(this->_head);
-                } else {
-                    return frd::move(this->_tail.template get<I - 1>());
-                }
-            }
-
-            template<frd::size_t I>
-            constexpr decltype(auto) get() const && noexcept {
-                if constexpr (I == 0) {
-                    return frd::move(this->_head);
-                } else {
-                    return frd::move(this->_tail.template get<I - 1>());
-                }
-            }
-
-            template<typename RhsHead, typename... RhsTail>
-            requires (_is_comparable<RhsHead, RhsTail...>())
-            constexpr auto operator <=>(const tuple<RhsHead, RhsTail...> &rhs) const
-            noexcept(
-                nothrow_synthetic_three_way_comparable_with<const Head &, const RhsHead &> &&
-                noexcept(this->_tail <=> rhs._tail)
-            ) {
-                const auto cmp = frd::synthetic_three_way_compare(this->_head, rhs._head);
-
-                if (cmp != 0) {
                     return cmp;
                 }
-
-                return this->_tail <=> rhs._tail;
             }
 
-            template<typename RhsHead, typename... RhsTail>
-            requires (_is_comparable<RhsHead, RhsTail...>())
-            constexpr bool operator ==(const tuple<RhsHead, RhsTail...> &rhs) const {
-                /* Equality only checks members, so can only be as efficient as <=>. */
+            template<typename... RhsElements>
+            requires (_is_comparable<RhsElements...>())
+            constexpr auto operator <=>(const tuple<RhsElements...> &rhs) const
+            noexcept(
+                (nothrow_synthetic_three_way_comparable_with<const Elements &, const RhsElements &> && ...)
+            ) {
+                return this->template _compare_recurse<0>(rhs);
+            }
+
+            template<typename... RhsElements>
+            requires (_is_comparable<RhsElements...>())
+            constexpr bool operator ==(const tuple<RhsElements...> &rhs) const
+            noexcept(
+                noexcept((*this <=> rhs) == 0)
+            ) {
+                /* Equality only checks members, so can only be as efficient as '<=>'. */
 
                 return (*this <=> rhs) == 0;
             }
     };
 
-    template<>
-    class tuple<> {
-        public:
-            constexpr auto operator <=>(const tuple &rhs) const noexcept = default;
-    };
-
+    /* Deduction guide for implicitly declared constructor. */
     template<typename... Ts>
     tuple(Ts...) -> tuple<Ts...>;
 
