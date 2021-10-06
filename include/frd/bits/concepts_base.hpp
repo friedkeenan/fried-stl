@@ -24,6 +24,9 @@ namespace frd {
     template<typename T, typename U>
     concept same_as_without_cv = same_as<remove_cv<T>, remove_cv<U>>;
 
+    template<typename T, typename U>
+    concept same_as_without_cvref = same_as_without_cv<remove_reference<T>, remove_reference<U>>;
+
     template<typename From, typename To>
     concept implicitly_convertible_to = requires(void (&func)(To), From &&from) {
         func(frd::forward<From>(from));
@@ -125,11 +128,17 @@ namespace frd {
     concept pointer = !same_as<remove_pointer<T>, T>;
 
     /*
-        Must be implemented through variable templates as adding 'const'
+        Must be implemented through variable templates as adding 'const' or 'volatile'
         to a function type does not change anything, so you need specialization.
     */
     template<typename T>
     concept const_type = is_const<T>;
+
+    template<typename T>
+    concept volatile_type = is_volatile<T>;
+
+    template<typename T>
+    concept cv_type = const_type<T> && volatile_type<T>;
 
     template<typename T>
     concept unbound_array = is_unbound_array<T>;
@@ -193,8 +202,14 @@ namespace frd {
         sizeof(T);
     };
 
+    template<typename From, typename To>
+    concept qualification_convertible_to = (
+        same_as_without_cvref<From, To> &&
+        convertible_to<remove_reference<From> *, remove_reference<To> *>
+    );
+
     template<typename Derived, typename Base>
-    concept derived_from = class_type<Derived> && class_type<Base> && convertible_to<const volatile Derived *, const volatile Base *>;
+    concept derived_from = inheritable<Derived> && inheritable<Base> && convertible_to<const volatile Derived *, const volatile Base *>;
 
     template<typename T>
     concept referenceable = requires {

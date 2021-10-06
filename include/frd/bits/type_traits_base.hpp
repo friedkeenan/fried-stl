@@ -52,6 +52,9 @@ namespace frd {
     template<typename T> constexpr inline bool is_const          = false;
     template<typename T> constexpr inline bool is_const<const T> = true;
 
+    template<typename T> constexpr inline bool is_volatile             = false;
+    template<typename T> constexpr inline bool is_volatile<volatile T> = true;
+
     template<typename T> constexpr inline bool is_lvalue_reference      = false;
     template<typename T> constexpr inline bool is_lvalue_reference<T &> = true;
 
@@ -210,6 +213,16 @@ namespace frd {
 
     template<typename Source, typename Destination>
     using match_cv = match_volatile<Source, match_const<Source, Destination>>;
+
+    template<typename Source, typename Destination> struct _match_reference                         : type_holder<Destination   > { };
+    template<typename Source, typename Destination> struct _match_reference<Source &,  Destination> : type_holder<Destination & > { };
+    template<typename Source, typename Destination> struct _match_reference<Source &&, Destination> : type_holder<Destination &&> { };
+
+    template<typename Source, typename Destination>
+    using match_reference = typename _match_reference<Source, Destination>::type;
+
+    template<typename Source, typename Destination>
+    using match_cvref = match_reference<Source, match_cv<Source, Destination>>;
 
     template<typename T> struct _remove_const          : type_holder<T> { };
     template<typename T> struct _remove_const<const T> : type_holder<T> { };

@@ -7,6 +7,7 @@
 #include <frd/memory.hpp>
 #include <frd/algorithm.hpp>
 #include <frd/array.hpp>
+#include <frd/span.hpp>
 #include <frd/vector.hpp>
 
 using namespace frd::arithmetic_literals;
@@ -64,6 +65,7 @@ static_assert(frd::_adl::_adl_swap<frd::unique_ptr<int> &, frd::unique_ptr<int> 
 static_assert(frd::nothrow_swappable<frd::unique_ptr<int> &>);
 
 static_assert(!frd::contiguous_iterator<frd::reverse_iterator<int *>>);
+static_assert(frd::contiguous_range<std::initializer_list<int>>);
 
 FRD_PLATFORM_USES_EXTENSION static_assert(frd::integral<unsigned __int128>);
 
@@ -83,6 +85,8 @@ static_assert(
         frd::tuple{frd::make_unique<int>(5)}
     ) == 420
 );
+
+static_assert(frd::qualification_convertible_to<const int, const volatile int>);
 
 consteval bool fuck() {
     struct S {

@@ -6,6 +6,7 @@
 #include <frd/bits/ranges/iterators.hpp>
 
 #include <frd/memory.hpp>
+#include <frd/limits.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
@@ -292,6 +293,8 @@ namespace frd {
 
     template<sized_range R>
     using range_size = decltype(frd::size(frd::declval<R &>()));
+
+    constexpr inline auto dynamic_extent = numeric_limits<frd::size_t>::max;
 
     template<typename R>
     concept _member_empty = requires(R &&r) {

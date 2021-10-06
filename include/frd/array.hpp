@@ -198,6 +198,15 @@ namespace frd {
     template<typename Head, typename... Rest>
     array(Head, Rest...) -> array<Head, sizeof...(Rest) + 1>;
 
+    template<typename T>
+    constexpr inline bool _array_specialization = false;
+
+    template<typename Element, frd::size_t Size>
+    constexpr inline bool _array_specialization<array<Element, Size>> = true;
+
+    template<typename T>
+    concept array_specialization = _array_specialization<remove_cvref<T>>;
+
     template<typename T, frd::size_t N, frd::size_t... I>
     constexpr array<remove_cv<T>, N> _to_array(const T (&arr)[N], index_sequence<I...>) {
         return {arr[I]...};

@@ -230,17 +230,20 @@ namespace frd {
     concept allocator_value_default_constructible = allocator_value_constructible_from<Allocator>;
 
     template<typename T>
+    union uninitialized {
+        T elem;
+
+        /* Cannot be defaulted as then it will try to default-construct 'elem'. */
+        constexpr uninitialized() noexcept { }
+    };
+
+    template<typename T>
     class allocator {
         public:
             using value_type = T;
             using size_type  = frd::size_t;
 
-            union UnitializedElement {
-                T elem;
-
-                /* Cannot be defaulted as then it will try to default-construct 'elem'. */
-                constexpr UnitializedElement() noexcept { }
-            };
+            using uninitialized_value = uninitialized<T>;
 
             constexpr allocator() noexcept = default;
             constexpr allocator(const allocator &other) noexcept = default;
@@ -260,9 +263,13 @@ namespace frd {
 
                         Clang will report that you can't cast from 'void *' in constexpr, but
                         GCC gobbles it up just fine, and if you implement it without constexpr
-                        then Clang works just fine with this.
+                        then Clang works just fine with this on all optimization levels.
+
+                        Technically this is ill-formed as casting from cv-qualified 'void *'
+                        is not a constant expression, but at runtime this should be perfectly
+                        okay.
                     */
-                    return static_cast<T *>(static_cast<void *>(new UnitializedElement[n]));
+                    return static_cast<T *>(static_cast<void *>(new uninitialized_value[n]));
                 } else {
                     return std::allocator<T>().allocate(n);
                 }
@@ -274,7 +281,7 @@ namespace frd {
                         I believe the static_casts are unnecessary but am
                         including them to remind of how 'ptr' was created.
                     */
-                    delete[] static_cast<UnitializedElement *>(static_cast<void *>(ptr));
+                    delete[] static_cast<uninitialized_value *>(static_cast<void *>(ptr));
                 } else {
                     std::allocator<T>().deallocate(ptr, n);
                 }

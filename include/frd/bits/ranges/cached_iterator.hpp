@@ -3,6 +3,7 @@
 #include <frd/bits/ranges/iterators.hpp>
 #include <frd/bits/ranges/access.hpp>
 
+#include <frd/memory.hpp>
 #include <frd/utility.hpp>
 #include <frd/concepts.hpp>
 
@@ -13,19 +14,12 @@ namespace frd {
     struct cached_iterator {
         using _iterator = range_iterator<R>;
 
-        union UninitialzedIterator {
-            _iterator it;
-
-            /* Cannot be defaulted as then it will try to default-construct 'it'. */
-            constexpr UninitialzedIterator() noexcept { }
-        };
-
-        UninitialzedIterator _it_holder = {};
+        uninitialized<_iterator> _it_holder = {};
         bool _initialized = false;
 
         constexpr void _destruct() {
             if (this->_initialized) {
-                this->_it_holder.it.~_iterator();
+                this->_it_holder.elem.~_iterator();
             }
         }
 
@@ -47,7 +41,7 @@ namespace frd {
             copy_constructible<_iterator>
         ) : _initialized(other._initialized) {
             if (other._initialized) {
-                this->_it_holder.it = other._it_holder.it;
+                this->_it_holder.elem = other._it_holder.elem;
             }
         }
 
@@ -62,7 +56,7 @@ namespace frd {
             this->_initialized = rhs._initialized;
 
             if (rhs._initialized) {
-                this->_it_holder.it = rhs._it_holder.it;
+                this->_it_holder.elem = rhs._it_holder.elem;
             }
 
             return *this;
@@ -76,7 +70,7 @@ namespace frd {
             move_constructible<_iterator>
         ) : _initialized(frd::exchange(other._initialized, false)) {
             if (other._initialized) {
-                this->_it_holder.it = frd::move(other._it_holder.it);
+                this->_it_holder.elem = frd::move(other._it_holder.elem);
             }
         }
 
@@ -91,7 +85,7 @@ namespace frd {
             this->_initialized = frd::exchange(rhs._initialized, false);
 
             if (this->_initialized) {
-                this->_it_holder.it = frd::move(rhs._it_holder.it);
+                this->_it_holder.elem = frd::move(rhs._it_holder.elem);
             }
         }
 
@@ -107,7 +101,7 @@ namespace frd {
 
             FRD_UNUSED(r);
 
-            return this->_it_holder.it;
+            return this->_it_holder.elem;
         }
 
         template<forwarder_for<R> RFwd, forwarder_for<_iterator> ItFwd>
@@ -116,8 +110,8 @@ namespace frd {
 
             FRD_UNUSED(r);
 
-            this->_it_holder.it = frd::forward<ItFwd>(it);
-            this->_initialized  = true;
+            this->_it_holder.elem = frd::forward<ItFwd>(it);
+            this->_initialized    = true;
         }
     };
 
