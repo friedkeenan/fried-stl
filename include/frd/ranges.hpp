@@ -9,4 +9,4 @@
 #include <frd/bits/ranges/view_base.hpp>
 #include <frd/bits/ranges/reverse_view.hpp>
 #include <frd/bits/ranges/interval.hpp>
-#include <frd/bits/ranges/repeat_view.hpp>
+#include <frd/bits/ranges/cycle_view.hpp>

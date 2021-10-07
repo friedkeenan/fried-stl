@@ -74,6 +74,9 @@ static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 static_assert(frd::tuple_like<frd::tuple<int>>);
 static_assert(frd::pair_like<frd::subrange<int *>>);
 
+static_assert(frd::view<frd::span<int, 2>>);
+static_assert(frd::same_as<frd::views::all_t<frd::span<int, 2>>, frd::span<int, 2>>);
+
 static_assert(
     frd::apply(
         frd::overloaded{
@@ -159,7 +162,7 @@ static_assert(cuck());
 int main(int argc, char **argv) {
     FRD_UNUSED(argc, argv);
 
-    constexpr auto fuck = frd::array{1, 2};
+    static constexpr auto fuck = frd::array{1, 2};
 
     std::printf("%d\n", frd::get<1>(fuck));
 
@@ -175,7 +178,12 @@ int main(int argc, char **argv) {
 
     static_assert(frd::subrange(fuck.begin(), fuck.end()).size() == 2);
 
-    for (const auto i : fuck | frd::views::reverse | frd::views::repeat(3) | frd::views::repeat(2)) {
+    constexpr auto s = frd::as_const_span(fuck);
+    static_assert(frd::same_as<decltype(s), const frd::span<const int, 2>>);
+
+    static_assert(frd::same_as<decltype(s | frd::views::cycle<3> | frd::views::cycle<2>), frd::cycle_view<frd::span<const int, 2>, 6>>);
+
+    for (const auto i : s | frd::views::reverse | frd::views::cycle<3> | frd::views::cycle<2>) {
         std::printf("repeat %d\n", i);
     }
 

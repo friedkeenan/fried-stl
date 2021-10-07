@@ -544,6 +544,9 @@ namespace frd {
     namespace views {
 
         template<typename R>
+        concept _decays_to_view = view<decay<R>>;
+
+        template<typename R>
         concept _can_ref_view = requires(R &&r) {
             frd::ref_view(frd::forward<R>(r));
         };
@@ -556,11 +559,11 @@ namespace frd {
         constexpr inline range_adaptor_closure all =
             []<viewable_range R>(R &&r)
             requires (
-                view<R>          ||
-                _can_ref_view<R> ||
+                _decays_to_view<R> ||
+                _can_ref_view<R>   ||
                 _can_subrange<R>
             ) {
-                if constexpr (view<R>) {
+                if constexpr (_decays_to_view<R>) {
                     return frd::decay_copy(frd::forward<R>(r));
                 } else if constexpr (_can_ref_view<R>) {
                     return frd::ref_view(frd::forward<R>(r));

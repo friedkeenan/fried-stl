@@ -26,7 +26,7 @@ namespace frd {
     concept span_specialization = _span_specialization<remove_cvref<T>>;
 
     template<typename Element, frd::size_t Extent = dynamic_extent>
-    class span {
+    class span : public view_tag {
         public:
             using element_type     = Element;
             using value_type       = remove_cv<Element>;
@@ -54,7 +54,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(It it, const size_type count) noexcept : _data(frd::to_address(it)), _size(count) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(count == Extent, "Invalid size for span with static extent!");
+                    FRD_ASSERT(count == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -63,7 +63,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(It it, S bound) noexcept : _data(frd::to_address(it)), _size(bound - it) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(bound - it == Extent, "Invalid size for span with static extent!");
+                    FRD_ASSERT(bound - it == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -95,7 +95,7 @@ namespace frd {
                 noexcept(frd::size(r))
             ) : _data(frd::data(r)), _size(frd::size(r)) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(frd::size(r) == Extent, "Invalid size for span with static extent!");
+                    FRD_ASSERT(frd::size(r) == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -104,7 +104,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(const std::initializer_list<ElementOther> list) noexcept : _data(frd::data(list)), _size(frd::size(list)) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(frd::size(list) == Extent, "Invalid size for span with static extent!");
+                    FRD_ASSERT(frd::size(list) == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -117,7 +117,7 @@ namespace frd {
             explicit(!HasDynamicExtent && ExtentOther == dynamic_extent)
             constexpr span(const span<ElementOther, ExtentOther> &source) noexcept : _data(source.data()), _size(source.size()) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(source.size() == Extent, "Invalid size for span with static extent!");
+                    FRD_ASSERT(source.size() == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -270,6 +270,16 @@ namespace frd {
         ::frd::span(frd::forward<R>(r));
     };
 
+    template<typename T, frd::size_t N>
+    constexpr span<const T, N> as_const_span(const span<T, N> s) noexcept {
+        return s;
+    }
+
+    template<span_convertible R>
+    constexpr auto as_const_span(R &&r) noexcept(noexcept(span(frd::forward<R>(r)))) {
+        return frd::as_const_span(span(frd::forward<R>(r)));
+    }
+
     /* TODO: Is it worth it to have versions for 'frd::strict_byte'? */
 
     template<
@@ -307,26 +317,26 @@ namespace frd {
 
     template<span_convertible R>
     auto as_bytes(R &&r) noexcept(noexcept(as_bytes(span(frd::forward<R>(r))))) {
-        return as_bytes(span(frd::forward<R>(r)));
+        return frd::as_bytes(span(frd::forward<R>(r)));
     }
 
     template<span_convertible R>
     auto as_writable_bytes(R &&r) noexcept(noexcept(as_writable_bytes(span(frd::forward<R>(r))))) {
-        return as_writable_bytes(span(frd::forward<R>(r)));
+        return frd::as_writable_bytes(span(frd::forward<R>(r)));
     }
 
     template<typename Object>
     frd::array<std::byte, sizeof(Object)> underlying_data_copy(Object &&obj) noexcept {
         frd::array<std::byte, sizeof(Object)> raw_data;
 
-        frd::copy(as_bytes(span<Object, 1>(std::addressof(obj))), raw_data.begin());
+        frd::copy(frd::as_bytes(span<Object, 1>(std::addressof(obj))), raw_data.begin());
 
         return raw_data;
     }
 
     template<typename Object>
     auto underlying_data(Object &obj) noexcept {
-        return as_bytes(span<const Object, 1>(std::addressof(obj), 1));
+        return frd::as_bytes(span<const Object, 1>(std::addressof(obj), 1));
     }
 
     template<typename Object>
@@ -335,7 +345,7 @@ namespace frd {
     template<typename Object>
     requires (!const_type<Object>)
     auto writable_underlying_data(Object &obj) noexcept {
-        return as_wirtable_bytes(span<const Object, 1>(std::addressof(obj), 1));
+        return frd::as_writable_bytes(span<const Object, 1>(std::addressof(obj), 1));
     }
 
     template<typename Object>
@@ -348,8 +358,5 @@ namespace std::ranges {
 
     template<typename Element, frd::size_t Extent>
     constexpr inline bool enable_borrowed_range<frd::span<Element, Extent>> = true;
-
-    template<typename Element, frd::size_t Extent>
-    constexpr inline bool enable_view<frd::span<Element, Extent>> = true;
 
 }
