@@ -237,7 +237,8 @@ namespace frd {
             /*
                 We need this bit of indirection to allow brace-enclosed initializer
                 lists to be deduced to 'std::initializer_list', as the compiler will
-                not know it can use 'std::initializer_list' for 'R'.
+                not know it can use 'std::initializer_list' for 'R' and to avoid
+                code duplication.
             */
             template<typename R>
             /* Requirements checked by callers. */

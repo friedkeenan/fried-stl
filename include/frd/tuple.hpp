@@ -34,44 +34,47 @@ namespace frd {
             get<I>(frd::forward<T>(t));
         };
 
-    }
+        /*
+            Needs to be a callable object for ADL lookup to be checked.
 
-    /*
-        Needs to be a callable object for ADL lookup to be checked.
+            'I' needs to be a specifiable template parameter, and so
+            cannot just be for the call operator, but rather the whole type.
 
-        'I' needs to be a specifiable template parameter, and so
-        cannot just be for the call operator, but rather the whole type.
-    */
-    template<frd::size_t I>
-    struct _get_fn {
-        template<typename Getable>
-        requires (
-            (I < tuple_size<Getable>)                               &&
-            (_member_get<I, Getable> || _adl::_adl_get<I, Getable>)
-        )
-        constexpr decltype(auto) operator ()(Getable &&getable) const
-        noexcept(
-            []() {
+            TODO: This needs to be in the '_adl' namespace to avoid a GCC bug.
+            We should move it out when that bug is fixed.
+        */
+        template<frd::size_t I>
+        struct _get_fn {
+            template<typename Getable>
+            requires (
+                (I < tuple_size<Getable>)                               &&
+                (_member_get<I, Getable> || _adl_get<I, Getable>)
+            )
+            constexpr decltype(auto) operator ()(Getable &&getable) const
+            noexcept(
+                []() {
+                    if constexpr (_member_get<I, Getable>) {
+                        return noexcept(frd::forward<Getable>(getable).template get<I>());
+                    } else {
+                        return noexcept(get<I>(frd::forward<Getable>(getable)));
+                    }
+                }()
+            ) {
                 if constexpr (_member_get<I, Getable>) {
-                    return noexcept(frd::forward<Getable>(getable).template get<I>());
+                    return frd::forward<Getable>(getable).template get<I>();
                 } else {
-                    return noexcept(get<I>(frd::forward<Getable>(getable)));
+                    return get<I>(frd::forward<Getable>(getable));
                 }
-            }()
-        ) {
-            if constexpr (_member_get<I, Getable>) {
-                return frd::forward<Getable>(getable).template get<I>();
-            } else {
-                return get<I>(frd::forward<Getable>(getable));
             }
-        }
-    };
+        };
+
+    }
 
     /* Needs to be in own namespace to avoid ADL conflicts. */
     namespace {
 
         template<frd::size_t I>
-        constexpr inline _get_fn<I> get;
+        constexpr inline _adl::_get_fn<I> get;
 
     }
 
@@ -84,7 +87,7 @@ namespace frd {
     concept nothrow_getable = getable<T, I> && noexcept(frd::get<I>(frd::declval<T>()));
 
     template<typename TupleLike, typename Sequence>
-    inline bool _has_tuple_elements;
+    constexpr inline inert_type _has_tuple_elements;
 
     template<typename TupleLike, frd::size_t... Indices>
     constexpr inline bool _has_tuple_elements<TupleLike, frd::index_sequence<Indices...>> = (

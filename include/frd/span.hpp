@@ -45,7 +45,7 @@ namespace frd {
 
             pointer _data = nullptr;
 
-            [[no_unique_address]] maybe_present<!HasDynamicExtent, size_type> _size = {};
+            [[no_unique_address]] maybe_present<HasDynamicExtent, size_type> _size = {};
 
             constexpr span() noexcept requires (Extent == 0 || HasDynamicExtent) = default;
 
@@ -71,6 +71,7 @@ namespace frd {
             requires (HasDynamicExtent || N == Extent)
             constexpr span(ElementOther (&arr)[N]) noexcept : _data(frd::data(arr)), _size(N) { }
 
+            /* TODO: Have 'std::array' overloads as well? */
             template<qualification_convertible_to<Element> ElementOther, frd::size_t N>
             requires (HasDynamicExtent || N == Extent)
             constexpr span(frd::array<ElementOther, N> &arr) noexcept : _data(arr.data()), _size(N) { }
@@ -201,7 +202,7 @@ namespace frd {
             }
 
             constexpr size_type size() const noexcept {
-                if constexpr (!HasDynamicExtent) {
+                if constexpr (HasDynamicExtent) {
                     return this->_size;
                 } else {
                     return Extent;
