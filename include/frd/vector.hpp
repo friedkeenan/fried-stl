@@ -45,9 +45,9 @@ namespace frd {
             size_type _size     = 0;
             size_type _capacity = 0;
 
-            [[no_unique_address]] Allocator _allocator;
+            [[no_unique_address]] Allocator _allocator = Allocator();
 
-            constexpr vector() noexcept(noexcept(Allocator())) requires (default_constructible<Allocator>) = default;
+            constexpr vector() requires (default_initializable<Allocator>) = default;
 
             constexpr explicit vector(const Allocator &alloc) noexcept : _allocator(alloc) { }
 
@@ -78,8 +78,8 @@ namespace frd {
             }
 
             constexpr void _reserve_impl(const size_type new_capacity) {
-                FRD_ASSERT(new_capacity <= this->max_size(), "Cannot reserve enough data!");
-                FRD_ASSERT(new_capacity >= this->_size,      "Cannot reserve less than current size!");
+                frd::precondition(new_capacity <= this->max_size(), "Cannot reserve enough data!");
+                frd::precondition(new_capacity >= this->_size,      "Cannot reserve less than current size!");
 
                 const auto new_data = _allocator_traits::allocate(this->_allocator, new_capacity);
 
@@ -167,13 +167,18 @@ namespace frd {
                     const auto elem_addr = pointer{elem_it};
 
                     _allocator_traits::construct(this->_allocator, elem_addr + shift_size, frd::iter_move(elem_it));
-                    _allocator_traits::destroy  (this->_allocator, elem_addr);
+
+                    /*
+                        TODO: Do we need this 'destroy' call or should we just use
+                        the assignment operator later instead of constructing?
+                    */
+                    _allocator_traits::destroy(this->_allocator, elem_addr);
                 }
             }
 
             [[nodiscard]]
             constexpr iterator _make_space_for_insertion(const const_iterator pos, const size_type insert_size) {
-                FRD_ASSERT(pos >= this->begin() && pos <= this->end(), "Invalid iterator for insertion!");
+                frd::precondition(pos >= this->begin() && pos <= this->end(), "Invalid iterator for insertion!");
 
                 const auto insert_offset = pos - this->begin();
 
@@ -471,14 +476,14 @@ namespace frd {
             /* TODO: Do we want 'at'? I'm not really a fan of it. */
             [[nodiscard]]
             constexpr reference operator [](size_type index) noexcept {
-                FRD_ASSERT(index < this->_size, "Index is past bounds of vector!");
+                frd::precondition(index < this->_size, "Index is past bounds of vector!");
 
                 return this->_data[index];
             }
 
             [[nodiscard]]
             constexpr const_reference operator [](size_type index) const noexcept {
-                FRD_ASSERT(index < this->_size, "Index is past bounds of vector!");
+                frd::precondition(index < this->_size, "Index is past bounds of vector!");
 
                 return this->_data[index];
             }

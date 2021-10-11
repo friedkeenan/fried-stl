@@ -245,6 +245,15 @@ namespace frd {
 
             using uninitialized_value = uninitialized<T>;
 
+            /*
+                According to the standard, unions just need to have a
+                *sufficient* size to hold their largest member, which
+                means they could be theoretically larger.
+
+                We check to make sure that isn't the case.
+            */
+            static_assert(sizeof(uninitialized_value) == sizeof(T));
+
             constexpr allocator() noexcept = default;
             constexpr allocator(const allocator &other) noexcept = default;
 
@@ -518,7 +527,7 @@ namespace frd {
     }
 
     template<unbound_array T>
-    requires (default_constructible<remove_extent<T>>)
+    requires (default_initializable<remove_extent<T>>)
     constexpr unique_ptr<T> make_unique(frd::size_t size) {
         return unique_ptr<T>(new remove_extent<T>[size]{});
     }
@@ -561,7 +570,7 @@ namespace frd {
                 scoped_ptr, but that will result in a lot of potential ambiguity with
                 other constructors, such as the move constructor.
             */
-            constexpr scoped_ptr() noexcept(noexcept(Allocator())) requires (default_constructible<Allocator>) = default;
+            constexpr scoped_ptr() noexcept(noexcept(Allocator())) requires (default_initializable<Allocator>) = default;
 
             constexpr explicit scoped_ptr(const Allocator &alloc) noexcept : _allocator(alloc) { }
 
@@ -702,7 +711,7 @@ namespace frd {
         return scoped_ptr<T, Allocator>(ptr, alloc);
     }
 
-    template<typename T, default_constructible Allocator = allocator<T>, typename... Args>
+    template<typename T, default_initializable Allocator = allocator<T>, typename... Args>
     requires (constructible_from<T, Args...>)
     constexpr scoped_ptr<T, Allocator> make_scoped(Args &&... args) {
         return make_scoped_with_allocator<T, Allocator>(Allocator(), frd::forward<Args>(args)...);

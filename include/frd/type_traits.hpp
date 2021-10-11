@@ -25,4 +25,7 @@ namespace frd {
     template<typename T>
     using decay = typename _decay<T>::type;
 
+    template<inheritable... Bases>
+    struct combine_bases : public Bases... { };
+
 }

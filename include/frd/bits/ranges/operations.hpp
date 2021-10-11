@@ -27,7 +27,7 @@ namespace frd {
                     it--;
                 }
             } else {
-                FRD_ASSERT(n >= 0, "Only bidirectional iterators can go backwards!");
+                frd::precondition(n >= 0, "Only bidirectional iterators can go backwards!");
 
                 while (n > 0) {
                     n--;
@@ -54,7 +54,7 @@ namespace frd {
             if constexpr (sized_sentinel_for<S, It>) {
                 const auto diff = bound - it;
 
-                FRD_ASSERT(n == 0 || diff == 0 || frd::sign(n) == frd::sign(diff), "The bound is in a different direction from the advance amount!");
+                frd::precondition(n == 0 || diff == 0 || frd::sign(n) == frd::sign(diff), "The bound is in a different direction from the advance amount!");
 
                 if (frd::abs(n) > frd::abs(diff)) {
                     (*this)(it, bound);
@@ -80,7 +80,7 @@ namespace frd {
 
                 return n;
             } else {
-                FRD_ASSERT(n >= 0, "Only bidirectional iterators can go backwards!");
+                frd::precondition(n >= 0, "Only bidirectional iterators can go backwards!");
 
                 while (n > 0 && it != bound) {
                     n--;

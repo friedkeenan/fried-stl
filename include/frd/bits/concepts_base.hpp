@@ -224,6 +224,30 @@ namespace frd {
         convertible_to<U, std::common_reference_t<T, U>>
     );
 
+    /* I do not implement 'std::common_type_t' because users are supposed be able to override that. */
+    template<typename T, typename U>
+    concept common_with = (
+        same_as<std::common_type_t<T, U>, std::common_type_t<U, T>> &&
+
+        requires {
+            static_cast<std::common_type_t<T, U>>(frd::declval<T>());
+            static_cast<std::common_type_t<T, U>>(frd::declval<U>());
+        } &&
+
+        common_reference_with<
+            add_lvalue_reference<const T>,
+            add_lvalue_reference<const U>
+        > &&
+
+        common_reference_with<
+            add_lvalue_reference<std::common_type_t<T, U>>,
+            std::common_reference_t<
+                add_lvalue_reference<const T>,
+                add_lvalue_reference<const U>
+            >
+        >
+    );
+
     template<typename LHS, typename RHS>
     concept assignable_from = (
         lvalue_reference<LHS>                            &&
@@ -270,8 +294,9 @@ namespace frd {
     template<typename T, typename... Args>
     concept nothrow_constructible_from = constructible_from<T, Args...> && noexcept(T(frd::declval<Args>()...));
 
+    /* Don't name this 'default_constructible' as it is not just about calling the constructor. */
     template<typename T>
-    concept default_constructible = constructible_from<T> && requires {
+    concept default_initializable = constructible_from<T> && requires {
         T{};
 
         /*

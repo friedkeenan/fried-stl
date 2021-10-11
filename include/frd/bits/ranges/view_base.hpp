@@ -290,7 +290,7 @@ namespace frd {
 
             [[no_unique_address]] maybe_present<StoreSize, size_type> _size = {};
 
-            constexpr subrange() requires (default_constructible<It>) = default;
+            constexpr subrange() requires (default_initializable<It>) = default;
 
             template<convertible_to_non_slicing<It> ItOther>
             constexpr subrange(ItOther it, S bound) requires (!StoreSize) : _it(frd::move(it)), _bound(bound) { }
@@ -298,7 +298,7 @@ namespace frd {
             template<convertible_to_non_slicing<It> ItOther>
             requires (Kind == subrange_kind::sized && !StoreSize)
             constexpr subrange(ItOther it, S bound, const size_type size) : _it(frd::move(it)), _bound(bound) {
-                FRD_UNUSED(size);
+                frd::discard(size);
             }
 
             template<convertible_to_non_slicing<It> ItOther>

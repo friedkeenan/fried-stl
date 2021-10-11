@@ -20,8 +20,3 @@
         op(*this);                                 \
         return ret;                                \
     }
-
-template<typename... Args>
-constexpr void FRD_UNUSED(Args &&... args) {
-    (static_cast<void>(args), ...);
-}

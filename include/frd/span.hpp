@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <memory>
 
+#include <frd/bits/ranges/access.hpp>
+#include <frd/bits/ranges/reverse_view.hpp>
+
 #include <frd/arithmetic.hpp>
 #include <frd/memory.hpp>
 #include <frd/utility.hpp>
 #include <frd/array.hpp>
-#include <frd/ranges.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 
@@ -54,7 +56,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(It it, const size_type count) noexcept : _data(frd::to_address(it)), _size(count) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(count == Extent, "Mismatched size for span with static extent!");
+                    frd::precondition(count == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -63,7 +65,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(It it, S bound) noexcept : _data(frd::to_address(it)), _size(bound - it) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(bound - it == Extent, "Mismatched size for span with static extent!");
+                    frd::precondition(bound - it == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -96,7 +98,7 @@ namespace frd {
                 noexcept(frd::size(r))
             ) : _data(frd::data(r)), _size(frd::size(r)) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(frd::size(r) == Extent, "Mismatched size for span with static extent!");
+                    frd::precondition(frd::size(r) == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -105,7 +107,7 @@ namespace frd {
             explicit(!HasDynamicExtent)
             constexpr span(const std::initializer_list<ElementOther> list) noexcept : _data(frd::data(list)), _size(frd::size(list)) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(frd::size(list) == Extent, "Mismatched size for span with static extent!");
+                    frd::precondition(frd::size(list) == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -118,7 +120,7 @@ namespace frd {
             explicit(!HasDynamicExtent && ExtentOther == dynamic_extent)
             constexpr span(const span<ElementOther, ExtentOther> &source) noexcept : _data(source.data()), _size(source.size()) {
                 if constexpr (!HasDynamicExtent) {
-                    FRD_ASSERT(source.size() == Extent, "Mismatched size for span with static extent!");
+                    frd::precondition(source.size() == Extent, "Mismatched size for span with static extent!");
                 }
             }
 
@@ -130,14 +132,14 @@ namespace frd {
             requires (Count <= Extent)
             constexpr span<Element, Count> first() const noexcept {
                 if constexpr (HasDynamicExtent) {
-                    FRD_ASSERT(Count <= this->size(), "Invalid subspan size!");
+                    frd::precondition(Count <= this->size(), "Invalid subspan size!");
                 }
 
                 return span<Element, Count>(this->_data, this->size() - Count);
             }
 
             constexpr span<Element> first(const size_type count) const noexcept {
-                FRD_ASSERT(count <= this->size(), "Invalid subspan size!");
+                frd::precondition(count <= this->size(), "Invalid subspan size!");
 
                 return span(this->_data, count);
             }
@@ -146,14 +148,14 @@ namespace frd {
             requires (Count <= Extent)
             constexpr span<Element, Count> last() const noexcept {
                 if constexpr (HasDynamicExtent) {
-                    FRD_ASSERT(Count <= this->size(), "Invalid subspan size!");
+                    frd::precondition(Count <= this->size(), "Invalid subspan size!");
                 }
 
                 return span(this->_data + this->size() - Count, Count);
             }
 
             constexpr span<Element> last(const size_type count) const noexcept {
-                FRD_ASSERT(count <= this->size(), "Invalid subspan size!");
+                frd::precondition(count <= this->size(), "Invalid subspan size!");
 
                 return span(this->_data + this->size() - count, count);
             }
@@ -175,7 +177,7 @@ namespace frd {
             requires (Offset <= Extent && (Count == dynamic_extent || Count <= Extent - Offset))
             constexpr span<Element, SubExtent> subspan() const noexcept {
                 if constexpr (HasDynamicExtent) {
-                    FRD_ASSERT(Offset <= this->size() && Count <= this->size() - Offset, "Invalid subspan size!");
+                    frd::precondition(Offset <= this->size() && Count <= this->size() - Offset, "Invalid subspan size!");
                 }
 
                 return span<Element, SubExtent>(
@@ -192,7 +194,7 @@ namespace frd {
             }
 
             constexpr span<Element> subspan(const size_type offset, const size_type count) const noexcept {
-                FRD_ASSERT(offset <= this->size(), count <= this->size() - offset, "Invalid subspan size!");
+                frd::precondition(offset <= this->size(), count <= this->size() - offset, "Invalid subspan size!");
 
                 return span(this->_data + offset, count);
             }
@@ -242,7 +244,7 @@ namespace frd {
             }
 
             constexpr reference operator [](const frd::size_t index) const noexcept {
-                FRD_ASSERT(index < this->size(), "Invalid index for span!");
+                frd::precondition(index < this->size(), "Invalid index for span!");
 
                 return this->_data[index];
             }

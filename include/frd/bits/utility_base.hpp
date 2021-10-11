@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include <frd/bits/utility_discard.hpp>
 #include <frd/bits/arithmetic_base.hpp>
 #include <frd/bits/type_traits_base.hpp>
 
@@ -42,28 +43,35 @@ namespace frd {
         return frd::_declval_impl<T>();
     }
 
+    /* TODO: Implement 'string_view' and make 'consteval_string_view'. */
     struct _dummy_compile_time_str {
         consteval _dummy_compile_time_str() = default;
 
         /* Implicit cast from string literal. */
         template<frd::size_t N>
         consteval _dummy_compile_time_str(const char (&str)[N]) {
-            FRD_UNUSED(str);
+            frd::discard(str);
         }
     };
 
     [[noreturn]]
     inline void unreachable(const _dummy_compile_time_str msg = {}) noexcept {
-        FRD_UNUSED(msg);
+        frd::discard(msg);
 
         /* Here we can have different implementations for unreachable code. */
 
         __builtin_unreachable();
     }
 
+    /* TODO: Does a macro give better compiler diagnostics than a function? */
+    constexpr void precondition(bool success, const _dummy_compile_time_str msg = {}) noexcept {
+        if (success) {
+            return;
+        }
+
+        /* Potentially have different functionality for failed precondiitons here. */
+
+        frd::unreachable(msg);
+    }
+
 }
-
-/* NOTE: 'FRD_ASSERT' does not give a meaningful error at runtime, but instead ends up invoking undefined behavior. */
-
-/* Don't use braced-if so that we require a semicolon after the macro. */
-#define FRD_ASSERT(expr, ...) if (!(expr)) ::frd::unreachable(__VA_ARGS__)

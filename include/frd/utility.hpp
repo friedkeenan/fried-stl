@@ -4,6 +4,7 @@
 #include <utility>
 #include <concepts>
 
+#include <frd/bits/utility_discard.hpp>
 #include <frd/bits/utility_base.hpp>
 #include <frd/bits/arithmetic_base.hpp>
 #include <frd/bits/concepts_base.hpp>

@@ -55,7 +55,7 @@ namespace frd {
                         nothrow_constructible_from<_sentinel, SFwd>
                     ) : _begin(frd::forward<ItFwd>(it)), _it(this->_begin), _bound(frd::forward<SFwd>(bound)), _cycles(cycles) {
                         if constexpr (!HasDynamicCycles) {
-                            FRD_ASSERT(cycles == NumCycles, "Mismatched cycle count for cycle_view with static cycle count!");
+                            frd::precondition(cycles == NumCycles, "Mismatched cycle count for cycle_view with static cycle count!");
                         }
                     }
 
@@ -95,7 +95,7 @@ namespace frd {
                     constexpr bool operator ==(const iterator &rhs) const = default;
 
                     constexpr bool operator ==(const default_sentinel_t &rhs) const {
-                        FRD_UNUSED(rhs);
+                        frd::discard(rhs);
 
                         return this->_loops_done == this->cycles();
                     }
@@ -106,7 +106,7 @@ namespace frd {
 
             constexpr cycle_view()
             requires (
-                default_constructible<V>             &&
+                default_initializable<V>             &&
                 (NumCycles == 0 || HasDynamicCycles)
             ) = default;
 
@@ -115,7 +115,7 @@ namespace frd {
                 nothrow_constructible_from<V, V &&>
             ) : _base(frd::move(base)), _cycles(cycles) {
                 if constexpr (!HasDynamicCycles) {
-                    FRD_ASSERT(cycles == NumCycles, "Mismatched cycle count for cycle_view with static cycle count!");
+                    frd::precondition(cycles == NumCycles, "Mismatched cycle count for cycle_view with static cycle count!");
                 }
             }
 

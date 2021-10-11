@@ -15,13 +15,13 @@ namespace frd {
 
         Can become an infinite range if passed an unreachable sentinel as the bound.
 
-        'End' must be semiregular so that the sentinel may also be semiregular.
+        'Bound' must be semiregular so that the sentinel may also be semiregular.
 
         'std::ranges::enable_borrowed_range' is specialized to 'true' further down.
     */
-    template<weakly_incrementable Start, weakly_equality_comparable_with<Start> End = Start>
-    requires (semiregular<End>)
-    class interval : public view_interface<interval<Start, End>> {
+    template<weakly_incrementable Start, weakly_equality_comparable_with<Start> Bound = Start>
+    requires (semiregular<Bound>)
+    class interval : public view_interface<interval<Start, Bound>> {
         public:
             class iterator {
                 public:
@@ -43,15 +43,24 @@ namespace frd {
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++)
+                    /* 'weakly_incrementable' does not guarantee any return value for post-increment. */
+                    constexpr decltype(auto) operator ++(int) {
+                        return this->_value++;
+                    }
 
-                    constexpr iterator &operator --() requires (weakly_decrementable<Start>) {
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, ++, requires (incrementable<Start>))
+
+                    constexpr iterator &operator --() requires (decrementable<Start>) {
                         this->_value--;
 
                         return *this;
                     }
 
-                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, requires (weakly_decrementable<Start>))
+                    /*
+                        NOTE: We do not need to consider just 'weakly_decrementable' as bidirectional
+                        iterators must be copyable and 'decrementable'.
+                    */
+                    constexpr FRD_RIGHT_UNARY_OP_FROM_LEFT(iterator, --, requires (decrementable<Start>))
 
                     constexpr iterator operator +(const difference_type delta) const
                     requires (
@@ -147,34 +156,34 @@ namespace frd {
 
             class _sentinel {
                 public:
-                    End _value;
+                    Bound _value;
 
                     constexpr _sentinel() = default;
 
-                    template<forwarder_for<End> EndFwd>
-                    constexpr explicit _sentinel(EndFwd &&value) noexcept(nothrow_constructible_from<End, EndFwd>)
-                        : _value(frd::forward<EndFwd>(value)) { }
+                    template<forwarder_for<Bound> BoundFwd>
+                    constexpr explicit _sentinel(BoundFwd &&value) noexcept(nothrow_constructible_from<Bound, BoundFwd>)
+                        : _value(frd::forward<BoundFwd>(value)) { }
 
                     constexpr iter_difference<Start> operator -(const iterator &rhs) const
                     requires (
-                        weakly_subtractable_with<const Start, const End, iter_difference<Start>>
+                        weakly_subtractable_with<const Start, const Bound, iter_difference<Start>>
                     ) {
                         return this->_value - rhs._value;
                     }
 
                     friend constexpr iter_difference<Start> operator -(const iterator &lhs, const _sentinel &rhs)
                     requires (
-                        weakly_subtractable_with<const Start, const End, iter_difference<Start>>
+                        weakly_subtractable_with<const Start, const Bound, iter_difference<Start>>
                     ) {
                         return lhs._value - rhs._value;
                     }
 
                     constexpr auto operator <=>(const iterator &rhs) const
                     noexcept(
-                        nothrow_synthetic_three_way_comparable_with<const End &, const Start &>
+                        nothrow_synthetic_three_way_comparable_with<const Bound &, const Start &>
                     )
                     requires (
-                        synthetic_three_way_comparable_with<const End &, const Start &>
+                        synthetic_three_way_comparable_with<const Bound &, const Start &>
                     ) {
                         return frd::synthetic_three_way_compare(this->_value, rhs._value);
                     }
@@ -193,28 +202,28 @@ namespace frd {
                 This enables certain iterator operations and certain optimizations for iterator operations.
             */
             using sentinel = conditional<
-                same_as<Start, End> && sentinel_for<iterator, iterator>,
+                same_as<Start, Bound> && sentinel_for<iterator, iterator>,
 
                 iterator,
                 _sentinel
             >;
 
-            [[no_unique_address]] Start _start;
-            [[no_unique_address]] End   _end;
+            [[no_unique_address]] Start start;
+            [[no_unique_address]] Bound bound;
 
-            template<forwarder_for<Start> StartFwd, forwarder_for<End> EndFwd>
-            constexpr interval(StartFwd &&start, EndFwd &&end)
+            template<forwarder_for<Start> StartFwd, forwarder_for<Bound> BoundFwd>
+            constexpr interval(StartFwd &&start, BoundFwd &&end)
             noexcept(
                 nothrow_constructible_from<Start, StartFwd> &&
-                nothrow_constructible_from<End,   EndFwd>
-            ) : _start(frd::forward<StartFwd>(start)), _end(frd::forward<EndFwd>(end)) { }
+                nothrow_constructible_from<Bound, BoundFwd>
+            ) : start(frd::forward<StartFwd>(start)), bound(frd::forward<BoundFwd>(end)) { }
 
-            template<forwarder_for<End> EndFwd>
+            template<forwarder_for<Bound> BoundFwd>
             requires (integral<Start>)
-            constexpr explicit interval(EndFwd &&end)
+            constexpr explicit interval(BoundFwd &&end)
             noexcept(
-                nothrow_constructible_from<End, EndFwd>
-            ) : interval(Start{}, frd::forward<EndFwd>(end)) { }
+                nothrow_constructible_from<Bound, BoundFwd>
+            ) : interval(Start{}, frd::forward<BoundFwd>(end)) { }
 
             [[nodiscard]]
             constexpr iterator begin() const
@@ -224,7 +233,7 @@ namespace frd {
             requires (
                 copy_constructible<Start>
             ) {
-                return iterator(this->_start);
+                return iterator(this->start);
             }
 
             [[nodiscard]]
@@ -237,15 +246,15 @@ namespace frd {
             ) {
                 /* To be weakly incrementable, a type must be movable, so no need to check here. */
 
-                return iterator(frd::move(this->_start));
+                return iterator(frd::move(this->start));
             }
 
             [[nodiscard]]
             constexpr sentinel end() const
             noexcept(
-                nothrow_constructible_from<sentinel, const End &>
+                nothrow_constructible_from<sentinel, const Bound &>
             ) {
-                return sentinel(this->_end);
+                return sentinel(this->bound);
             }
     };
 
@@ -253,8 +262,8 @@ namespace frd {
     requires (integral<remove_cvref<T>>)
     interval(T &&) -> interval<decay<T>, decay<T>>;
 
-    template<typename Start, typename End>
-    interval(Start &&, End &&) -> interval<decay<Start>, decay<End>>;
+    template<typename Start, typename Bound>
+    interval(Start &&, Bound &&) -> interval<decay<Start>, decay<Bound>>;
 
     namespace views {
 
@@ -281,7 +290,7 @@ namespace frd {
 
 namespace std::ranges {
 
-    template<typename Start, typename End>
-    constexpr inline bool enable_borrowed_range<frd::interval<Start, End>> = true;
+    template<typename Start, typename Bound>
+    constexpr inline bool enable_borrowed_range<frd::interval<Start, Bound>> = true;
 
 }

@@ -97,9 +97,9 @@ namespace frd {
         template<forwarder_for<R> RFwd>
         [[nodiscard]]
         constexpr _iterator get(RFwd &&r) const {
-            FRD_ASSERT(this->has_value(), "cached_iterator doesn't have a value!");
+            frd::precondition(this->has_value(), "cached_iterator doesn't have a value!");
 
-            FRD_UNUSED(r);
+            frd::discard(r);
 
             return this->_it_holder.elem;
         }
@@ -108,7 +108,7 @@ namespace frd {
         constexpr void set(RFwd &&r, ItFwd &&it) {
             /* TODO: Assert that we have no value? */
 
-            FRD_UNUSED(r);
+            frd::discard(r);
 
             this->_it_holder.elem = frd::forward<ItFwd>(it);
             this->_initialized    = true;
@@ -153,7 +153,7 @@ namespace frd {
         template<forwarder_for<R> RFwd>
         [[nodiscard]]
         constexpr _iterator get(RFwd &&r) const {
-            FRD_ASSERT(this->has_value(), "cached_iterator doesn't have a value!");
+            frd::precondition(this->has_value(), "cached_iterator doesn't have a value!");
 
             return frd::begin(frd::forward<RFwd>(r)) + this->_offset;
         }

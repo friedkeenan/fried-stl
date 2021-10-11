@@ -1,6 +1,6 @@
 #pragma once
 
-#include <frd/defines.hpp>
+#include <frd/utility.hpp>
 #include <frd/concepts.hpp>
 
 namespace frd {
@@ -37,7 +37,7 @@ namespace frd {
             }
 
             constexpr auto operator <=>(const _only_zero rhs) const noexcept {
-                FRD_UNUSED(rhs);
+                frd::discard(rhs);
 
                 return (this->_sign <=> 0);
             }

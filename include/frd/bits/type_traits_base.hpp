@@ -3,6 +3,7 @@
 #include <type_traits>
 
 #include <frd/bits/arithmetic_base.hpp>
+#include <frd/bits/utility_discard.hpp>
 
 #include <frd/defines.hpp>
 #include <frd/platform.hpp>
@@ -16,7 +17,7 @@ namespace frd {
             don't need to specify the type.
 
             It would be incorrect to use this in certain situations, such
-            as with 'std::tuple_size' as it is UB to have a specialization
+            as with 'std::tuple_size', as it is UB to have a specialization
             of 'std::tuple_size' not inherit from 'std::integral_constant<std::size_t, N>'.
         */
         template<auto v>
@@ -454,12 +455,13 @@ namespace frd {
     template<typename T>
     using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
 
+    /* TODO: Should this be in 'type_traits'? */
     struct inert_type {
         constexpr inert_type() noexcept = default;
 
         template<typename... Args>
         constexpr inert_type(Args &&... args) noexcept {
-            FRD_UNUSED(args...);
+            frd::discard(args...);
         }
     };
 

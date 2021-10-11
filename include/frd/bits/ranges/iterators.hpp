@@ -19,14 +19,14 @@ namespace frd {
     namespace unsafe {
 
         /*
-            An implementation of unspecialized 'std::iterator_traits'.
+            An implementation of primary 'std::iterator_traits'.
 
             As with other traits-types, it would be incorrect to use
             this as it is expected that you can specialize 'std::iterator_traits'.
 
             However, we use it to compare 'std::iterator_traits<It>' to our
-            unspecialized implementation to see if the former is *effectively*
-            unspecialized; that is to say whether it would have no effect were
+            primary implementation to see if the former is *effectively*
+            primary; that is to say whether it would have no effect were
             it specialized or not. We do this by comparing each field in the
             iterator traits.
         */
@@ -65,7 +65,7 @@ namespace frd {
         concept _cpp17_forward_iterator = (
             _cpp17_input_iterator<It> &&
 
-            /* Slightly different from 'default_constructible'. */
+            /* Slightly different from 'default_initializable'. */
             constructible_from<It> &&
 
             lvalue_reference<iter_reference<It>> &&
@@ -195,7 +195,7 @@ namespace frd {
         template<typename It>
         struct iterator_traits : _iterator_traits<It> {
             /* Something I wish the standard had. */
-            using _unspecialized_flag = void;
+            using _primary_flag = void;
         };
 
     }
@@ -214,7 +214,7 @@ namespace frd {
         equivalent to our implementation of the primary template.
     */
     template<typename StdTraits, typename FrdTraits>
-    concept _effectively_unspecialized_iter_traits_impl = (
+    concept _effectively_primary_iter_traits_impl = (
         (_empty_iter_traits<StdTraits> && _empty_iter_traits<FrdTraits>) ||
 
         (
@@ -234,8 +234,8 @@ namespace frd {
     );
 
     template<typename It>
-    concept _effectively_unspecialized_iter_traits = (
-        _effectively_unspecialized_iter_traits_impl<
+    concept _effectively_primary_iter_traits = (
+        _effectively_primary_iter_traits_impl<
             std::iterator_traits<It>,
             unsafe::iterator_traits<It>
         >
@@ -244,10 +244,10 @@ namespace frd {
     template<typename It>
     struct iterator_traits : public std::iterator_traits<It> { };
 
-    template<_effectively_unspecialized_iter_traits It>
+    template<_effectively_primary_iter_traits It>
     struct iterator_traits<It> : public std::iterator_traits<It> {
         /* Something I wish the standard had. */
-        using _unspecialized_flag = void;
+        using _primary_flag = void;
     };
 
     /*
@@ -256,7 +256,7 @@ namespace frd {
     */
     template<typename It>
     concept primary_iterator_traits = requires {
-        typename iterator_traits<remove_cvref<It>>::_unspecialized_flag;
+        typename iterator_traits<remove_cvref<It>>::_primary_flag;
     };
 
     namespace _adl {
@@ -348,13 +348,21 @@ namespace frd {
     using iter_rvalue_reference = decltype(frd::iter_move(frd::declval<It &>()));
 
     template<typename It>
-    concept weakly_incrementable = movable<It> && requires(It it) {
+    concept _has_sane_iter_difference = requires {
         typename iter_difference<It>;
         requires non_bool_signed_integral<iter_difference<It>>;
-
-        { ++it } -> same_as<It &>;
-        it++;
     };
+
+    template<typename It>
+    concept weakly_incrementable = (
+        movable<It>                   &&
+        _has_sane_iter_difference<It> &&
+
+        requires(It it) {
+            { ++it } -> same_as<It &>;
+            it++;
+        }
+    );
 
     template<typename It>
     concept incrementable = regular<It> && weakly_incrementable<It> && requires(It it) {
@@ -362,13 +370,15 @@ namespace frd {
     };
 
     template<typename It>
-    concept weakly_decrementable = movable<It> && requires(It it) {
-        typename iter_difference<It>;
-        requires non_bool_signed_integral<iter_difference<It>>;
+    concept weakly_decrementable = (
+        movable<It>                   &&
+        _has_sane_iter_difference<It> &&
 
-        { --it } -> same_as<It &>;
-        it--;
-    };
+        requires(It it) {
+            { --it } -> same_as<It &>;
+            it--;
+        }
+    );
 
     template<typename It>
     concept decrementable = regular<It> && weakly_decrementable<It> && requires(It it) {
@@ -500,7 +510,26 @@ namespace frd {
 
     }
 
-    /* Equivalent to 'std::input_or_output_iterator'. */
+    template<typename ItT, typename ItU>
+    concept indirectly_swappable = (
+        indirectly_readable<ItT> &&
+        indirectly_readable<ItU> &&
+
+        requires(const ItT it_t, const ItU it_u) {
+            ::frd::iter_swap(it_t, it_t);
+            ::frd::iter_swap(it_u, it_u);
+            ::frd::iter_swap(it_t, it_u);
+            ::frd::iter_swap(it_u, it_t);
+        }
+    );
+
+    /*
+        Equivalent to 'std::input_or_output_iterator'.
+
+        NOTE: Input and output iterators do not have any constraint
+        on the return type of their post-increment, as they do
+        not need to be copyable.
+    */
     template<typename It>
     concept iterator = requires(It it) {
         { *it } -> referenceable;

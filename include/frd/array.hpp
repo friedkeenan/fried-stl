@@ -2,10 +2,12 @@
 
 #include <tuple>
 
+#include <frd/bits/ranges/interval.hpp>
+#include <frd/bits/ranges/reverse_view.hpp>
+
 #include <frd/arithmetic.hpp>
 #include <frd/utility.hpp>
 #include <frd/tuple.hpp>
-#include <frd/ranges.hpp>
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 
@@ -139,13 +141,13 @@ namespace frd {
 
 
             constexpr reference operator [](const size_type index) noexcept {
-                FRD_ASSERT(index < Size, "Index is past bounds of array!");
+                frd::precondition(index < Size, "Index is past bounds of array!");
 
                 return this->_elems[index];
             }
 
             constexpr const_reference operator [](const size_type index) const noexcept {
-                FRD_ASSERT(index < Size, "Index is past bounds of array!");
+                frd::precondition(index < Size, "Index is past bounds of array!");
 
                 return this->_elems[index];
             }

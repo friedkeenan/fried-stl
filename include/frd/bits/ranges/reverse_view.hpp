@@ -247,7 +247,7 @@ namespace frd {
 
             [[no_unique_address]] maybe_present<StoreCachedCommonEnd, cached_iterator<V>> _cached_common_end = {};
 
-            constexpr reverse_view() requires (default_constructible<V>) = default;
+            constexpr reverse_view() requires (default_initializable<V>) = default;
 
             constexpr reverse_view(V base) : _base(frd::move(base)) { }
 

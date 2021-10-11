@@ -77,6 +77,8 @@ static_assert(frd::pair_like<frd::subrange<int *>>);
 static_assert(frd::view<frd::span<int, 2>>);
 static_assert(frd::same_as<frd::views::all_t<frd::span<int, 2>>, frd::span<int, 2>>);
 
+static_assert(frd::decrementable<int>);
+
 static_assert(
     frd::apply(
         frd::overloaded{
@@ -90,6 +92,9 @@ static_assert(
 );
 
 static_assert(frd::qualification_convertible_to<const int, const volatile int>);
+
+static_assert(frd::contiguous_iterator<frd::counted_iterator<int *>>);
+static_assert(frd::random_access_iterator<frd::counted_iterator<frd::reverse_iterator<int *>>>);
 
 consteval bool fuck() {
     struct S {
@@ -160,7 +165,7 @@ consteval bool cuck() {
 static_assert(cuck());
 
 int main(int argc, char **argv) {
-    FRD_UNUSED(argc, argv);
+    frd::discard(argc, argv);
 
     static constexpr auto fuck = frd::array{1, 2};
 
@@ -183,7 +188,9 @@ int main(int argc, char **argv) {
 
     static_assert(frd::same_as<decltype(s | frd::views::cycle<3> | frd::views::cycle<2>), frd::cycle_view<frd::span<const int, 2>, 6>>);
 
-    for (const auto i : s | frd::views::reverse | frd::views::cycle<3> | frd::views::cycle<2>) {
+    constexpr auto rng = s | frd::views::reverse | frd::views::cycle<3> | frd::views::cycle<2>;
+
+    for (const auto i : frd::views::counted(rng.begin(), 5)) {
         std::printf("repeat %d\n", i);
     }
 
