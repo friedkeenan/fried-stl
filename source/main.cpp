@@ -130,7 +130,9 @@ consteval bool fuck() {
 
     v.insert(v.end(), 500, S(false));
 
-    return v[0].value && !v[1].value && v[2].value && !v[6].value && v.capacity() == 507;
+    const auto erase_ret = v.erase(v.begin() + 1, v.end() - 1);
+
+    return erase_ret == v.begin() + 1 && v[0].value && !v[1].value && v.size() == 2 && v.capacity() == 507;
 }
 
 static_assert(fuck());
@@ -147,10 +149,14 @@ consteval bool shit() {
     bool success = true;
 
     int compare = 4;
-    for (const auto i : frd::interval(0, IntSentinel{}) | frd::views::reverse | frd::views::iterators) {
+    for (const auto i : frd::interval(0, IntSentinel{}) | frd::views::reverse | frd::views::iterators | frd::views::cycle<>(3) | frd::views::cycle<>(2)) {
         success = (success && (*i == compare));
 
-        compare--;
+        /*
+            Add 4 instead of subtracting 1 to get a positive 'compare' because
+            C++'s '%' operator doesn't only return positive numbers.
+        */
+        compare = (compare + 4) % 5;
     }
 
     return success;

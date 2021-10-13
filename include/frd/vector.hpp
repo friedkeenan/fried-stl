@@ -299,6 +299,39 @@ namespace frd {
                 this->_size--;
             }
 
+            constexpr void _shift_elements_backward(const iterator begin_shift, const size_type shift_size) {
+                for (const auto elem_it : interval(begin_shift, this->end() - shift_size)) {
+                    *elem_it = frd::iter_move(elem_it + shift_size);
+                }
+            }
+
+            constexpr iterator erase(const const_iterator pos) {
+                const auto mutable_pos = this->_to_mutable_iterator(pos);
+
+                this->_shift_elements_backward(mutable_pos, 1);
+                _allocator_traits::destroy(this->_allocator, pointer{frd::prev(this->end())});
+
+                this->_size--;
+
+                return mutable_pos;
+            }
+
+            /* Require an 'interval' here? */
+            constexpr iterator erase(const const_iterator start, const const_iterator bound) {
+                const auto erase_size    = bound - start;
+                const auto mutable_start = this->_to_mutable_iterator(start);
+
+                this->_shift_elements_backward(mutable_start, erase_size);
+
+                for (const auto elem_it : interval(mutable_start, this->_to_mutable_iterator(bound))) {
+                    _allocator_traits::destroy(this->_allocator, pointer{elem_it});
+                }
+
+                this->_size -= erase_size;
+
+                return mutable_start;
+            }
+
             constexpr void shrink_to_fit() {
                 /* We don't need to reallocate if the size and capacity already match. */
                 if (this->_size == this->_capacity) {
