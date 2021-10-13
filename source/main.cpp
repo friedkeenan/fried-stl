@@ -96,6 +96,8 @@ static_assert(frd::qualification_convertible_to<const int, const volatile int>);
 static_assert(frd::contiguous_iterator<frd::counted_iterator<int *>>);
 static_assert(frd::random_access_iterator<frd::counted_iterator<frd::reverse_iterator<int *>>>);
 
+static_assert(frd::same_as<frd::make_index_sequence<5>, frd::index_sequence<0, 1, 2, 3, 4>>);
+
 consteval bool fuck() {
     struct S {
         bool value = false;

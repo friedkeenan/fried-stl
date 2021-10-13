@@ -158,16 +158,47 @@ namespace frd {
     template<typename T>
     concept nothrow_synthetic_three_way_comparable = nothrow_synthetic_three_way_comparable_with<T, T>;
 
-    template<frd::size_t... I>
-    using index_sequence = std::integer_sequence<frd::size_t, I...>;
+    template<auto... Constants>
+    struct constant_sequence { };
 
-    /* Unfortunately requires compiler magic. */
+    /*
+        NOTE: The standard requires specifying the type; we do not.
+
+        TODO: Require these all to be the same type?
+    */
+    template<integral auto... Ints>
+    using integer_sequence = constant_sequence<Ints...>;
+
+    template<frd::size_t... Indices>
+    using index_sequence = constant_sequence<Indices...>;
+
+    template<auto N, auto... Ints>
+    struct _make_integer_sequence : _make_integer_sequence<N - 1, N - 1, Ints...> { };
+
+    template<auto N, auto... Ints>
+    /* Cannot just put '0' in as 'N' as that will only specialize for 'int{0}'. */
+    requires (N == 0)
+    struct _make_integer_sequence<N, Ints...> {
+        using type = constant_sequence<Ints...>;
+    };
+
+    template<integral auto N>
+    using make_integer_sequence = typename _make_integer_sequence<N>::type;
+
     template<frd::size_t N>
-    using make_index_sequence = std::make_integer_sequence<frd::size_t, N>;
+    using make_index_sequence = make_integer_sequence<N>;
 
     /* An argument passed to remove ambiguity with copy/move constructors. */
     struct not_copy_move_tag_t { };
 
     constexpr inline not_copy_move_tag_t not_copy_move_tag{};
+
+    template<typename Object>
+    constexpr const Object &as_const(Object &obj) noexcept {
+        return obj;
+    }
+
+    template<typename Object>
+    void as_const(const Object &&) = delete;
 
 }
