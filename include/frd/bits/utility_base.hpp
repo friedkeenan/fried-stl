@@ -23,6 +23,8 @@ namespace frd {
     template<typename T>
     [[nodiscard]]
     constexpr T &&forward(remove_reference<T> &&t) noexcept {
+        static_assert(!is_lvalue_reference<T>, "Cannot forward lvalue references to this overload!");
+
         return static_cast<T &&>(t);
     }
 

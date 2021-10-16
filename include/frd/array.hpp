@@ -152,24 +152,29 @@ namespace frd {
                 return this->_elems[index];
             }
 
-            template<size_type I>
-            constexpr reference get() & noexcept {
-                return this->_elems[I];
+            template<frd::size_t I, typename Self>
+            static constexpr decltype(auto) _get(Self &&self) noexcept {
+                return frd::forward<Self>(self)._elems[I];
             }
 
-            template<size_type I>
-            constexpr const_reference get() const & noexcept {
-                return this->_elems[I];
+            template<frd::size_t I>
+            constexpr decltype(auto) get() & noexcept {
+                return _get<I>(*this);
             }
 
-            template<size_type I>
-            constexpr Element &&get() && noexcept {
-                return frd::move(this->_elems[I]);
+            template<frd::size_t I>
+            constexpr decltype(auto) get() const & noexcept {
+                return _get<I>(*this);
             }
 
-            template<size_type I>
-            constexpr Element &&get() const && noexcept {
-                return frd::move(this->_elems[I]);
+            template<frd::size_t I>
+            constexpr decltype(auto) get() && noexcept {
+                return _get<I>(frd::move(*this));
+            }
+
+            template<frd::size_t I>
+            constexpr decltype(auto) get() const && noexcept {
+                return _get<I>(frd::move(*this));
             }
 
             constexpr auto operator <=>(const array &rhs) const

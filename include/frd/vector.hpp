@@ -251,11 +251,7 @@ namespace frd {
                 const auto insert_size = frd::size(insert_rng);
                 const auto insert_it   = this->_make_space_for_insertion(pos, insert_size);
 
-                /*
-                    Insert the elements of the range into the empty locations we have made for it.
-
-                    TODO: 'enumerate' might be better here.
-                */
+                /* Insert the elements of the range into the empty locations we have made for it. */
                 auto insert_location = pointer{insert_it};
                 for (auto &&to_insert : insert_rng) {
                     _allocator_traits::construct(this->_allocator, insert_location, frd::forward<decltype(to_insert)>(to_insert));
@@ -519,6 +515,41 @@ namespace frd {
                 frd::precondition(index < this->_size, "Index is past bounds of vector!");
 
                 return this->_data[index];
+            }
+
+            constexpr auto operator <=>(const vector &rhs) const
+            noexcept(
+                nothrow_synthetic_three_way_comparable<const Element &>
+            )
+            requires (
+                synthetic_three_way_comparable<const Element &>
+            ) {
+                for (const auto &[lhs_elem, rhs_elem] : views::zip(*this, rhs)) {
+                    const auto cmp = synthetic_three_way_compare(lhs_elem, rhs_elem);
+
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                }
+
+                return this->_size <=> rhs._size;
+            }
+
+            constexpr bool operator ==(const vector &rhs) const
+            requires (
+                equality_comparable<const Element &>
+            ) {
+                if (this->_size != rhs._size) {
+                    return false;
+                }
+
+                for (const auto &[lhs_elem, rhs_elem] : views::zip(*this, rhs)) {
+                    if (lhs_elem != rhs_elem) {
+                        return false;
+                    }
+                }
+
+                return true;
             }
     };
 

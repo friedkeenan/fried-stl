@@ -13,6 +13,8 @@
 using namespace frd::arithmetic_literals;
 
 static_assert(frd::tuple{1, 2} == frd::tuple{1, 2});
+static_assert(frd::pair{3, 4} == frd::pair{3, 4});
+static_assert(frd::pair{5, 6} == frd::tuple{5, 6});
 
 static_assert(sizeof(frd::size_t)    == 8);
 static_assert(sizeof(frd::int8_t)    == 1);
@@ -73,6 +75,7 @@ static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 
 static_assert(frd::tuple_like<frd::tuple<int>>);
 static_assert(frd::pair_like<frd::subrange<int *>>);
+static_assert(frd::pair_like<frd::pair<int, int>>);
 
 static_assert(frd::view<frd::span<int, 2>>);
 static_assert(frd::same_as<frd::views::all_t<frd::span<int, 2>>, frd::span<int, 2>>);
@@ -172,6 +175,8 @@ consteval bool cuck() {
 
 static_assert(cuck());
 
+static_assert(frd::vector<int>() == frd::vector<int>());
+
 int main(int argc, char **argv) {
     frd::discard(argc, argv);
 
@@ -179,7 +184,7 @@ int main(int argc, char **argv) {
 
     std::printf("%d\n", frd::get<1>(fuck));
 
-    const auto &[x, y] = fuck;
+    const auto [x, y] = fuck;
     std::printf("%d %d\n", x, y);
 
     static_assert(frd::common_range<decltype(frd::subrange(fuck))>);
@@ -198,8 +203,43 @@ int main(int argc, char **argv) {
 
     constexpr auto rng = s | frd::views::reverse | frd::views::cycle<3> | frd::views::cycle<2>;
 
-    for (const auto i : frd::views::counted(rng.begin(), 5)) {
-        std::printf("repeat %d\n", i);
+    for (const auto [i, num] : frd::views::counted(rng.begin(), 5) | frd::views::enumerate) {
+        std::printf("repeat[%ld]: %d\n", i, num);
+    }
+
+    constexpr auto zip = frd::views::zip(frd::interval(0, frd::unreachable_sentinel), frd::interval(3, 6) | frd::views::cycle<2>);
+
+    for (const auto [a, b] : zip) {
+        std::printf("zip %d %d\n", a, b);
+    }
+
+    frd::apply_for_each(
+        frd::overloaded{
+            [](int x) { std::printf("int %d\n", x); },
+
+            [](char c) { std::printf("char %c\n", c); }
+        },
+
+        frd::pair{69, 'h'}
+    );
+
+    std::printf(
+        "%d\n",
+        frd::get<1>(frd::pair{4, 6}.transform([](int x) {
+            return x * 2;
+        }))
+    );
+
+    const auto other = frd::tuple_convert<short, short>(frd::tuple{'h', 's'});
+    std::printf("convert %d %d\n", frd::get<0>(other), frd::get<1>(other));
+
+    for (auto i : frd::interval(0, frd::unreachable_sentinel) | frd::views::iterators) {
+        if (*i == 6) {
+            break;
+        }
+
+        i += 1;
+        std::printf("loop %d\n", *i);
     }
 
     return 0;

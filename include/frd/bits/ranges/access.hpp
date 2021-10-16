@@ -199,6 +199,15 @@ namespace frd {
     concept view = range<R> && movable<R> && std::ranges::enable_view<R>;
 
     template<typename R>
+    concept _simple_view = (
+        view<R>        &&
+        range<const R> &&
+
+        same_as<range_iterator<R>, range_iterator<const R>> &&
+        same_as<range_sentinel<R>, range_sentinel<const R>>
+    );
+
+    template<typename R>
     concept input_range = range<R> && input_iterator<range_iterator<R>>;
 
     template<typename R, typename Value>

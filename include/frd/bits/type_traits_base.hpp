@@ -468,6 +468,9 @@ namespace frd {
     template<bool IsPresent, typename T>
     using maybe_present = conditional<IsPresent, T, inert_type>;
 
+    template<bool Const, typename T>
+    using maybe_const = conditional<Const, const T, T>;
+
     /* Only operations on types that are forced to use STL APIs below. */
 
     template<typename T>

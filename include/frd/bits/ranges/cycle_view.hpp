@@ -182,7 +182,13 @@ namespace frd {
         requires (NumCycles == dynamic_extent)
         constexpr inline frd::range_adaptor cycle<NumCycles> =
             []<viewable_range R>(R &&r, const frd::size_t cycles) {
-                /* Try to unwrap range if possible. */
+                /*
+                    Try to unwrap range if possible.
+
+                    We can't check if 'cycles' equals 1 as it is not a template
+                    parameter, and so we would need some common type between the
+                    range and its 'cycle_view'.
+                */
                 if constexpr (_cycle_view_specialization<R>) {
                     /*
                         Use after forward is okay here as a move of an integral type is
@@ -204,7 +210,9 @@ namespace frd {
         constexpr inline frd::range_adaptor_closure cycle<NumCycles> =
             []<viewable_range R>(R &&r) {
                 /* Try to unwrap range if possible. */
-                if constexpr (_cycle_view_specialization<R>) {
+                if constexpr (NumCycles == 1) {
+                    return frd::forward<R>(r);
+                } else if constexpr (_cycle_view_specialization<R>) {
                     using base_view = remove_reference<R>::base_view;
 
                     constexpr auto base_cycles = remove_reference<R>::num_cycles;

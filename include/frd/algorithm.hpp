@@ -25,6 +25,21 @@ namespace frd {
         }
     }
 
+    template<less_than_comparable T, same_as<T>... Rest, invocable<const T &> Proj>
+    constexpr T min_with_projection(Proj proj, const T &first, const Rest &... rest) {
+        if constexpr (sizeof...(Rest) == 0) {
+            return first;
+        } else {
+            const auto rest_min = min_with_projection(proj, rest...);
+
+            if (frd::invoke(proj, first) < frd::invoke(proj, rest_min)) {
+                return first;
+            }
+
+            return rest_min;
+        }
+    }
+
     template<less_than_comparable T, same_as<T>... Rest>
     constexpr T max(const T &first, const Rest &... rest) noexcept {
         if constexpr (sizeof...(Rest) == 0) {
@@ -37,6 +52,21 @@ namespace frd {
             }
 
             return first;
+        }
+    }
+
+    template<less_than_comparable T, same_as<T>... Rest, invocable<const T &> Proj>
+    constexpr T max_with_projection(Proj proj, const T &first, const Rest &... rest) {
+        if constexpr (sizeof...(Rest) == 0) {
+            return first;
+        } else {
+            const auto rest_max = max_with_projection(proj, rest...);
+
+            if (frd::invoke(proj, rest_max) < frd::invoke(proj, first)) {
+                return first;
+            }
+
+            return rest_max;
         }
     }
 

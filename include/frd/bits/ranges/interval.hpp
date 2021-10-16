@@ -25,11 +25,13 @@ namespace frd {
         public:
             class iterator {
                 public:
-                    using value_type      = Start;
-                    using difference_type = iter_difference<Start>;
-                    using reference       = Start;
+                    using value_type = Start;
+                    using reference  = Start;
 
-                    Start _value;
+                    /* TODO: Make this conditionally 'int128_t' to avoid overflow issues? */
+                    using difference_type = iter_difference<Start>;
+
+                    [[no_unique_address]] Start _value;
 
                     constexpr iterator() = default;
 
@@ -156,7 +158,7 @@ namespace frd {
 
             class _sentinel {
                 public:
-                    Bound _value;
+                    [[no_unique_address]] Bound _value;
 
                     constexpr _sentinel() = default;
 

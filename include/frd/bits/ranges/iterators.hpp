@@ -510,7 +510,7 @@ namespace frd {
 
     }
 
-    template<typename ItT, typename ItU>
+    template<typename ItT, typename ItU = ItT>
     concept indirectly_swappable = (
         indirectly_readable<ItT> &&
         indirectly_readable<ItU> &&
@@ -705,5 +705,17 @@ namespace frd {
     struct default_sentinel_t { };
 
     constexpr inline default_sentinel_t default_sentinel{};
+
+    struct unreachable_sentinel_t {
+        /* TODO: Make this an object parameter method. */
+        template<weakly_incrementable It>
+        friend constexpr bool operator ==(unreachable_sentinel_t s, const It &it) noexcept {
+            frd::discard(s, it);
+
+            return false;
+        }
+    };
+
+    constexpr inline unreachable_sentinel_t unreachable_sentinel{};
 
 }

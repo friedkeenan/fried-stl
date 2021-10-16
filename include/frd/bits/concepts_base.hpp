@@ -311,6 +311,9 @@ namespace frd {
     concept move_constructible = constructible_from<T, T> && convertible_to<T, T>;
 
     template<typename T>
+    concept nothrow_move_constructible = move_constructible<T> && nothrow_constructible_from<T, T>;
+
+    template<typename T>
     concept move_assignable = assignable_from<T &, T &&>;
 
     template<typename T>

@@ -56,17 +56,21 @@ namespace frd {
     constexpr inline sign sign::positive = sign( 1);
     constexpr inline sign sign::negative = sign(-1);
 
-    template<arithmetic T>
-    constexpr T abs(const T num) noexcept {
-        if constexpr (unsigned_type<T>) {
-            return num;
-        } else {
-            if (num < 0) {
-                return -num;
-            }
+    struct _abs_fn {
+        template<arithmetic T>
+        constexpr T operator ()(const T num) noexcept {
+            if constexpr (unsigned_type<T>) {
+                return num;
+            } else {
+                if (num < 0) {
+                    return -num;
+                }
 
-            return num;
+                return num;
+            }
         }
-    }
+    };
+
+    constexpr inline _abs_fn abs{};
 
 }
