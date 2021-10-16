@@ -211,7 +211,7 @@ namespace frd {
             []<viewable_range R>(R &&r) {
                 /* Try to unwrap range if possible. */
                 if constexpr (NumCycles == 1) {
-                    return frd::forward<R>(r);
+                    return views::all(frd::forward<R>(r));
                 } else if constexpr (_cycle_view_specialization<R>) {
                     using base_view = remove_reference<R>::base_view;
 
