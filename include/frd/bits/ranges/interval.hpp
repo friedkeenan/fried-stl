@@ -28,7 +28,7 @@ namespace frd {
                     using value_type = Start;
                     using reference  = Start;
 
-                    /* TODO: Make this conditionally 'int128_t' to avoid overflow issues? */
+                    /* TODO: Promote this to highwer widths (including to 'uint128_t') to avoid overflow issues? */
                     using difference_type = iter_difference<Start>;
 
                     [[no_unique_address]] Start _value;
