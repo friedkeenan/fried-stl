@@ -13,7 +13,7 @@ namespace frd {
 
     /* Should not be specialized. */
     template<typename T>
-    constexpr inline frd::size_t tuple_size = std::tuple_size<remove_cvref<T>>::value;
+    constexpr inline frd::size_t tuple_size = std::tuple_size<remove_reference<T>>::value;
 
     template<frd::size_t I, typename T>
     using tuple_element = typename std::tuple_element<I, remove_reference<T>>::type;
@@ -266,6 +266,25 @@ namespace frd {
 
         noexcept(frd::apply_for_each(frd::declval<Invocable>(), frd::declval<TupleLikes>()...))
     );
+
+    template<typename T, typename ElementsList>
+    constexpr inline inert_type _constructible_from_tuple_elements;
+
+    template<typename T, typename... Elements>
+    constexpr inline bool _constructible_from_tuple_elements<T, type_list<Elements...>> = (
+        constructible_from<T, Elements...>
+    );
+
+    template<typename T, typename TupleLike, frd::size_t... Indices>
+    constexpr T _make_from_tuple(TupleLike &&tuple_like, frd::index_sequence<Indices...>) {
+        return T(frd::get<Indices>(frd::forward<TupleLike>(tuple_like))...);
+    }
+
+    template<typename T, tuple_like TupleLike>
+    requires (_constructible_from_tuple_elements<T, forwarding_tuple_elements<TupleLike>>)
+    constexpr T make_from_tuple(TupleLike &&tuple_like) {
+        return _make_from_tuple<T>(frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<tuple_size<TupleLike>>{});
+    }
 
     template<frd::size_t ElementIndex, typename Element>
     struct _tuple_element_holder {

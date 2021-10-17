@@ -244,5 +244,11 @@ int main(int argc, char **argv) {
         std::printf("loop %d\n", *i);
     }
 
+    std::printf(
+        "make_from_tuple %d\n",
+
+        frd::make_from_tuple<int>(frd::tuple{666})
+    );
+
     return 0;
 }
