@@ -186,8 +186,8 @@ namespace frd {
                     Try to unwrap range if possible.
 
                     We can't check if 'cycles' equals 1 as it is not a template
-                    parameter, and so we would need some common type between the
-                    range and its 'cycle_view'.
+                    parameter, and so we would need some common type between
+                    'views::all(frd::forward<R>(r))' and its 'cycle_view'.
                 */
                 if constexpr (_cycle_view_specialization<R>) {
                     /*

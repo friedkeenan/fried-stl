@@ -46,13 +46,12 @@ namespace frd {
     requires ((view<Views> && ...) && sizeof...(Views) > 0)
     class zip_view : public view_interface<zip_view<Views...>> {
         public:
-            template<typename... Elements>
-            using tuple_or_pair = conditional<
-                sizeof...(Elements) == 2,
-
-                detected_else<void, pair, Elements...>,
-                tuple<Elements...>
-            >;
+            /*
+                NOTE: the standard uses an exposition only 'tuple-or-pair'
+                template that uses a tuple or pair depending on the amount
+                of elements. We do not need to do so as our 'pair' is just
+                an alias for 'tuple'.
+            */
 
             template<bool Const>
             struct _iterator_category { };
@@ -86,10 +85,10 @@ namespace frd {
                         >
                     >;
 
-                    using value_type      = tuple_or_pair<range_value<maybe_const<Const, Views>>...>;
+                    using value_type      = tuple<range_value<maybe_const<Const, Views>>...>;
                     using difference_type = std::common_type_t<range_difference<maybe_const<Const, Views>>...>;
 
-                    using _iterators = tuple_or_pair<range_iterator<maybe_const<Const, Views>>...>;
+                    using _iterators = tuple<range_iterator<maybe_const<Const, Views>>...>;
 
                     _iterators _its;
 
@@ -281,7 +280,7 @@ namespace frd {
             template<bool Const>
             class sentinel {
                 public:
-                    using _sentinels = tuple_or_pair<range_sentinel<maybe_const<Const, Views>>...>;
+                    using _sentinels = tuple<range_sentinel<maybe_const<Const, Views>>...>;
 
                     _sentinels _bounds;
 
@@ -347,7 +346,7 @@ namespace frd {
                     }
             };
 
-            tuple_or_pair<Views...> _views;
+            tuple<Views...> _views;
 
             constexpr zip_view() = default;
 

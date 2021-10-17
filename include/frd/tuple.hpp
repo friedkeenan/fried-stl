@@ -283,6 +283,81 @@ namespace frd {
         }
     };
 
+    /*
+        We specialize the first two element holders of a tuple
+        to have a 'first' and 'second' member so that we can have
+        'pair<T, U>' just be an alias for 'tuple<T, U>' and
+        reduce code duplication.
+    */
+
+    template<typename Element>
+    struct _tuple_element_holder<0, Element> {
+        [[no_unique_address]] Element first;
+
+        /*
+            Require that 'I' equals our index, so that the correct 'get'
+            method will be called just through overload resolution.
+        */
+
+        template<frd::size_t I>
+        requires (I == 0)
+        constexpr Element &get() & noexcept {
+            return this->first;
+        }
+
+        template<frd::size_t I>
+        requires (I == 0)
+        constexpr const Element &get() const & noexcept {
+            return this->first;
+        }
+
+        template<frd::size_t I>
+        requires (I == 0)
+        constexpr Element &&get() && noexcept {
+            return frd::move(this->first);
+        }
+
+        template<frd::size_t I>
+        requires (I == 0)
+        constexpr const Element &&get() const && noexcept {
+            return frd::move(this->first);
+        }
+    };
+
+    template<typename Element>
+    struct _tuple_element_holder<1, Element> {
+        [[no_unique_address]] Element second;
+
+        /*
+            Require that 'I' equals our index, so that the correct 'get'
+            method will be called just through overload resolution.
+        */
+
+        template<frd::size_t I>
+        requires (I == 1)
+        constexpr Element &get() & noexcept {
+            return this->second;
+        }
+
+        template<frd::size_t I>
+        requires (I == 1)
+        constexpr const Element &get() const & noexcept {
+            return this->second;
+        }
+
+        template<frd::size_t I>
+        requires (I == 1)
+        constexpr Element &&get() && noexcept {
+            return frd::move(this->second);
+        }
+
+        template<frd::size_t I>
+        requires (I == 1)
+        constexpr const Element &&get() const && noexcept {
+            return frd::move(this->second);
+        }
+    };
+
     template<typename... ElementHolders>
     struct _combine_tuple_element_holders : ElementHolders... {
         /*
@@ -322,6 +397,12 @@ namespace frd {
         nothrow_synthetic_three_way_comparable_with<Elements, CmpElements> && ...
     );
 
+    template<typename Invocable, typename... ElementsFwd>
+    concept _tuple_can_transform = (
+        (sizeof...(ElementsFwd) <= 1 && (invocable<Invocable,   ElementsFwd> && ...)) ||
+        (sizeof...(ElementsFwd) >  1 && (invocable<Invocable &, ElementsFwd> && ...))
+    );
+
     /*
         NOTE: The way we inherit from each base causes us to store
         the first element before the second element before the third,
@@ -347,42 +428,47 @@ namespace frd {
 
             /* TODO: 'swap' method and assignment operator. */
 
-            template<typename Invocable, typename... ElementsFwd>
-            static consteval bool _can_transform() {
-                return (
-                    (sizeof...(Elements) <= 1 && (invocable<Invocable,   ElementsFwd> && ...)) ||
-                    (sizeof...(Elements) >  1 && (invocable<Invocable &, ElementsFwd> && ...))
-                );
-            }
-
             template<typename Self, typename Invocable>
             static constexpr auto _transform(Self &&self, Invocable &&invocable)
             noexcept(
-                (
-                    sizeof...(Elements) <= 1                        &&
-                    (nothrow_invocable<Invocable, Elements> && ...) &&
+                []() {
+                    using RealInvocable = conditional<sizeof...(Elements) <= 1, Invocable, Invocable &>;
 
-                    noexcept(frd::decay_copy(frd::declval<tuple<invoke_result<Invocable, Elements>...>>()))
-                ) ||
-                (
-                    sizeof...(Elements) > 1                           &&
-                    (nothrow_invocable<Invocable &, Elements> && ...) &&
+                    return (
+                        (nothrow_invocable<Invocable, match_cvref<Self, Elements>> && ...) &&
 
-                    noexcept(frd::decay_copy(frd::declval<tuple<invoke_result<Invocable &, Elements>...>>()))
-                )
+                        noexcept(
+                            frd::decay_copy(
+                                frd::declval<
+                                    tuple<
+                                        invoke_result<RealInvocable, match_cvref<Self, Elements>>...
+                                    >
+                                >()
+                            )
+                        )
+                    );
+                }()
             ) {
+                using RealInvocable = conditional<sizeof...(Elements) <= 1, Invocable, Invocable &>;
+
+                /*
+                    Without specifying template arguments, the compiler assumes
+                    we're constructing the current type we are in and ignores
+                    template deduction.
+                */
+                using Return = tuple<invoke_result<RealInvocable, match_cvref<Self, Elements>>...>;
+
                 return frd::apply([&]<typename... ElementsFwd>(ElementsFwd &&... elements) {
-                    /* Without specifying template arguments, the compiler assumes the current type we are in. */
                     if constexpr (sizeof...(Elements) <= 1) {
-                        return tuple<invoke_result<Invocable, Elements>...>{frd::invoke(frd::forward<Invocable>(invocable), frd::forward<ElementsFwd>(elements))...};
+                        return Return{frd::invoke(frd::forward<Invocable>(invocable), frd::forward<ElementsFwd>(elements))...};
                     } else {
-                        return tuple<invoke_result<Invocable &, Elements>...>{frd::invoke(invocable, frd::forward<ElementsFwd>(elements))...};
+                        return Return{frd::invoke(invocable, frd::forward<ElementsFwd>(elements))...};
                     }
                 }, frd::forward<Self>(self));
             }
 
             template<typename Invocable>
-            requires (_can_transform<Invocable, Elements &...>())
+            requires (_tuple_can_transform<Invocable, Elements &...>)
             constexpr auto transform(Invocable &&invocable) &
             noexcept(
                 noexcept(_transform(*this, frd::forward<Invocable>(invocable)))
@@ -391,7 +477,7 @@ namespace frd {
             }
 
             template<typename Invocable>
-            requires (_can_transform<Invocable, const Elements &...>())
+            requires (_tuple_can_transform<Invocable, const Elements &...>)
             constexpr auto transform(Invocable &&invocable) const &
             noexcept(
                 noexcept(_transform(*this, frd::forward<Invocable>(invocable)))
@@ -400,7 +486,7 @@ namespace frd {
             }
 
             template<typename Invocable>
-            requires (_can_transform<Invocable, Elements &&...>())
+            requires (_tuple_can_transform<Invocable, Elements &&...>)
             constexpr auto transform(Invocable &&invocable) &&
             noexcept(
                 noexcept(_transform(frd::move(*this), frd::forward<Invocable>(invocable)))
@@ -409,7 +495,7 @@ namespace frd {
             }
 
             template<typename Invocable>
-            requires (_can_transform<Invocable, const Elements &&...>())
+            requires (_tuple_can_transform<Invocable, const Elements &&...>)
             constexpr auto transform(Invocable &&invocable) const &&
             noexcept(
                 noexcept(_transform(frd::move(*this), frd::forward<Invocable>(invocable)))
@@ -458,166 +544,15 @@ namespace frd {
     template<typename... Ts>
     tuple(Ts...) -> tuple<Ts...>;
 
-    /* TODO: Code duplication isn't great. SHould we just make 'pair<T, U>' an alias for 'tuple<T, U>'? */
     template<typename First, typename Second>
-    class pair {
-        public:
-            [[no_unique_address]] First  first;
-            [[no_unique_address]] Second second;
-
-            /*
-                NOTE: For some reason we need forwarding references for the return
-                of 'get' here instead of 'decltype(auto)'. I think it may be because
-                we're returning members.
-            */
-            template<frd::size_t I, typename Self>
-            static constexpr auto &&_get(Self &&self) noexcept {
-                if constexpr (I == 0) {
-                    return frd::forward<Self>(self).first;
-                } else {
-                    return frd::forward<Self>(self).second;
-                }
-            }
-
-            template<frd::size_t I>
-            constexpr auto &&get() & noexcept {
-                return _get<I>(*this);
-            }
-
-            template<frd::size_t I>
-            constexpr auto &&get() const & noexcept {
-                return _get<I>(*this);
-            }
-
-            template<frd::size_t I>
-            constexpr auto &&get() && noexcept {
-                return _get<I>(frd::move(*this));
-            }
-
-            template<frd::size_t I>
-            constexpr auto &&get() const && noexcept {
-                return _get<I>(frd::move(*this));
-            }
-
-            template<
-                typename Self,
-                typename Invocable,
-                typename FirstFwd  = match_cvref<Self, First>,
-                typename SecondFwd = match_cvref<Self, Second>
-            >
-            static constexpr auto _transform(Self &&self, Invocable &&invocable)
-            noexcept(
-                nothrow_invocable<Invocable &, FirstFwd>  &&
-                nothrow_invocable<Invocable &, SecondFwd> &&
-
-                noexcept(
-                    frd::decay_copy(
-                        frd::declval<
-                            pair<
-                                invoke_result<Invocable &, FirstFwd>,
-                                invoke_result<Invocable &, SecondFwd>
-                            >
-                        >()
-                    )
-                )
-            ) {
-                return (
-                    pair<
-                        invoke_result<Invocable &, FirstFwd>,
-                        invoke_result<Invocable &, SecondFwd>
-                    >{
-                        frd::invoke(invocable, frd::forward<Self>(self).first),
-                        frd::invoke(invocable, frd::forward<Self>(self).second)
-                    }
-                );
-            }
-
-            template<typename Invocable>
-            requires (
-                invocable<Invocable &, First  &> &&
-                invocable<Invocable &, Second &>
-            )
-            constexpr auto transform(Invocable &&invocable) &
-            noexcept(
-                noexcept(_transform(*this, frd::forward<Invocable>(invocable)))
-            ) {
-                return _transform(*this, frd::forward<Invocable>(invocable));
-            }
-
-            template<typename Invocable>
-            requires (
-                invocable<Invocable &, const First  &> &&
-                invocable<Invocable &, const Second &>
-            )
-            constexpr auto transform(Invocable &&invocable) const &
-            noexcept(
-                noexcept(_transform(*this, frd::forward<Invocable>(invocable)))
-            ) {
-                return _transform(*this, frd::forward<Invocable>(invocable));
-            }
-
-            template<typename Invocable>
-            requires (
-                invocable<Invocable &, First  &&> &&
-                invocable<Invocable &, Second &&>
-            )
-            constexpr auto transform(Invocable &&invocable) &&
-            noexcept(
-                noexcept(_transform(frd::move(*this), frd::forward<Invocable>(invocable)))
-            ) {
-                return _transform(frd::move(*this), frd::forward<Invocable>(invocable));
-            }
-
-            template<typename Invocable>
-            requires (
-                invocable<Invocable &, const First  &&> &&
-                invocable<Invocable &, const Second &&>
-            )
-            constexpr auto transform(Invocable &&invocable) const &&
-            noexcept(
-                noexcept(_transform(frd::move(*this), frd::forward<Invocable>(invocable)))
-            ) {
-                return _transform(frd::move(*this), frd::forward<Invocable>(invocable));
-            }
-
-            template<pair_like RhsPairLike>
-            requires (_is_tuple_comparable<type_list<const First &, const Second &>, forwarding_tuple_elements<const RhsPairLike &>>)
-            constexpr auto operator <=>(const RhsPairLike &rhs) const
-            noexcept(
-                _nothrow_tuple_comparable<type_list<const First &, const Second &>, forwarding_tuple_elements<const RhsPairLike &>>
-            ) {
-                const auto cmp_first = frd::synthetic_three_way_compare(this->first, frd::get<0>(rhs));
-
-                if (cmp_first != 0) {
-                    return cmp_first;
-                }
-
-                return frd::synthetic_three_way_compare(this->second, frd::get<1>(rhs));
-            }
-
-            template<pair_like RhsPairLike>
-            constexpr bool operator ==(const RhsPairLike &rhs) const {
-                return (*this <=> rhs) == 0;
-            }
-    };
-
-    template<typename First, typename Second>
-    pair(First, Second) -> pair<First, Second>;
+    using pair = tuple<First, Second>;
 
     /* TODO: 'noexcept' for 'tuple_convert'. */
     template<typename... NewElements, tuple_like_with_size<sizeof...(NewElements)> OldTupleLike>
-    requires (sizeof...(NewElements) != 2)
     constexpr tuple<NewElements...> tuple_convert(OldTupleLike &&old_tuple_like) {
         return frd::apply([]<typename... Elements>(Elements &&... elements) {
             return tuple<NewElements...>{frd::forward<Elements>(elements)...};
         }, frd::forward<OldTupleLike>(old_tuple_like));
-    }
-
-    template<typename NewFirst, typename NewSecond, pair_like OldPairLike>
-    constexpr pair<NewFirst, NewSecond> tuple_convert(OldPairLike &&old_pair_like) {
-        return frd::apply([]<typename First, typename Second>(First &&first, Second &&second) {
-            return pair<NewFirst, NewSecond>{frd::forward<First>(first), frd::forward<Second>(second)};
-        }, frd::forward<OldPairLike>(old_pair_like));
     }
 
 }
@@ -634,14 +569,5 @@ namespace std {
     /* Base case. */
     template<typename Head, typename... Tail>
     struct tuple_element<0, frd::tuple<Head, Tail...>> : frd::type_holder<Head> { };
-
-    template<typename First, typename Second>
-    struct tuple_size<frd::pair<First, Second>> : frd::constant_holder<frd::size_t{2}> { };
-
-    template<typename First, typename Second>
-    struct tuple_element<0, frd::pair<First, Second>> : frd::type_holder<First> { };
-
-    template<typename First, typename Second>
-    struct tuple_element<1, frd::pair<First, Second>> : frd::type_holder<Second> { };
 
 }

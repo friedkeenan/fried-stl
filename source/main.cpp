@@ -16,6 +16,8 @@ static_assert(frd::tuple{1, 2} == frd::tuple{1, 2});
 static_assert(frd::pair{3, 4} == frd::pair{3, 4});
 static_assert(frd::pair{5, 6} == frd::tuple{5, 6});
 
+static_assert(frd::pair{7, 8}.first == frd::pair{8, 7}.second);
+
 static_assert(sizeof(frd::size_t)    == 8);
 static_assert(sizeof(frd::int8_t)    == 1);
 static_assert(sizeof(frd::int16_t)   == 2);
