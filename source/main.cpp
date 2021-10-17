@@ -217,12 +217,12 @@ int main(int argc, char **argv) {
 
     frd::apply_for_each(
         frd::overloaded{
-            [](int x) { std::printf("int %d\n", x); },
+            [](int x, char c) { std::printf("int %d char %c\n", x, c); },
 
-            [](char c) { std::printf("char %c\n", c); }
+            [](char c, int x) { std::printf("char %c int %d\n", c, x); }
         },
 
-        frd::pair{69, 'h'}
+        frd::pair{69, 'h'}, frd::pair{'a', 420}
     );
 
     std::printf(

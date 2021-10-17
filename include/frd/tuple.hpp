@@ -108,9 +108,7 @@ namespace frd {
 
     template<typename TupleLike, frd::size_t... Indices>
     constexpr inline bool _has_tuple_elements<TupleLike, frd::index_sequence<Indices...>> = (
-        requires(TupleLike &&tuple_like) {
-            frd::get<Indices>(frd::forward<TupleLike>(tuple_like));
-        } && ...
+        getable<TupleLike, Indices> && ...
     );
 
     template<typename T>
@@ -171,71 +169,86 @@ namespace frd {
         noexcept(frd::apply(frd::declval<Invocable>(), frd::declval<TupleLike>()))
     );
 
-    template<typename Invocable, typename ElementsList>
-    constexpr inline inert_type _invocable_for_each_tuple_element;
-
-    template<typename Invocable, typename... Elements>
-    constexpr inline bool _invocable_for_each_tuple_element<Invocable, type_list<Elements...>> =
+    template<frd::size_t I, frd::size_t N, typename Invocable, typename... TupleLikes>
+    constexpr inline bool _invocable_for_each_tuple_element =
         []() {
-            if constexpr (sizeof...(Elements) <= 1) {
-                return (invocable<Invocable, Elements> && ...);
+            if constexpr (N == 0) {
+                return true;
+            } else if constexpr (N == 1) {
+                return invocable<Invocable, forwarding_tuple_element<I, TupleLikes>...>;
             } else {
-                return (invocable<Invocable &, Elements> && ...);
+                constexpr bool can_invoke_for_index = invocable<Invocable &, forwarding_tuple_element<I, TupleLikes>...>;
+
+                if constexpr (!can_invoke_for_index || I == N - 1) {
+                    return can_invoke_for_index;
+                } else {
+                    return _invocable_for_each_tuple_element<I + 1, N, Invocable &, TupleLikes...>;
+                }
             }
         }();
 
-    template<typename Invocable, typename TupleLike, frd::size_t... Indices>
-    constexpr void _apply_for_each(Invocable &&invocable, TupleLike &&tuple_like, frd::index_sequence<Indices...>)
+    template<frd::size_t I, frd::size_t N, typename Invocable, typename... TupleLikes>
+    constexpr void _apply_for_each(Invocable &&invocable, TupleLikes &&... tuple_likes)
     noexcept(
         []() {
-            if constexpr (sizeof...(Indices) <= 1) {
-                return noexcept((frd::invoke(frd::forward<Invocable>(invocable), frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...));
+            if constexpr (N == 1) {
+                return noexcept(frd::invoke(frd::forward<Invocable>(invocable), frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...));
             } else {
-                return noexcept((frd::invoke(invocable, frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...));
+                constexpr auto noexcept_invoke_for_index = noexcept(
+                    frd::invoke(invocable, frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...)
+                );
+
+                if constexpr (!noexcept_invoke_for_index || I == N - 1) {
+                    return noexcept_invoke_for_index;
+                } else {
+                    return noexcept(_apply_for_each<I + 1, N>(invocable, frd::forward<TupleLikes>(tuple_likes)...));
+                }
             }
         }()
     ) {
-        /*
-            If there are 0 or 1 elements in the tuple-like object,
-            we can safely forward 'invocable' on as we won't be using
-            it multiple times.
-        */
-        if constexpr (sizeof...(Indices) <= 1) {
-            (frd::invoke(frd::forward<Invocable>(invocable), frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...);
+        if constexpr (N == 1) {
+            frd::invoke(frd::forward<Invocable>(invocable), frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...);
         } else {
-            (frd::invoke(invocable, frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...);
+            frd::invoke(invocable, frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...);
+
+            if constexpr (I < N - 1) {
+                _apply_for_each<I + 1, N>(invocable, frd::forward<TupleLikes>(tuple_likes)...);
+            }
         }
+
     }
 
-
-    /*
-        TODO: Is it possible to have this take multiple tuples
-        and have the invocable take multiple arguments? I don't
-        believe it is since it would require parameter packs of
-        parameter packs and even if that were possible there would
-        be ambiguity with unpacking them with 'Indices'.
-    */
-    template<typename Invocable, tuple_like TupleLike>
-    requires (_invocable_for_each_tuple_element<Invocable, forwarding_tuple_elements<TupleLike>>)
-    constexpr void apply_for_each(Invocable &&invocable, TupleLike &&tuple_like)
+    template<
+        typename Invocable,
+        tuple_like HeadTupleLike,
+        frd::size_t TupleSize = tuple_size<HeadTupleLike>,
+        tuple_like_with_size<TupleSize>... TailTupleLikes
+    >
+    requires (_invocable_for_each_tuple_element<0, TupleSize, Invocable, HeadTupleLike, TailTupleLikes...>)
+    constexpr void apply_for_each(Invocable &&invocable, HeadTupleLike &&head_tuple_like, TailTupleLikes &&... tail_tuple_likes)
     noexcept(
         []() {
-            return noexcept(
-                _apply_for_each(
-                    frd::forward<Invocable>(invocable),
-                    frd::forward<TupleLike>(tuple_like),
-
-                    frd::make_index_sequence<tuple_size<TupleLike>>{}
-                )
-            );
+            if constexpr (TupleSize == 0) {
+                return true;
+            } else {
+                return noexcept(
+                    _apply_for_each<0, tuple_size<HeadTupleLike>>(
+                        frd::forward<Invocable>(invocable),
+                        frd::forward<HeadTupleLike>(head_tuple_like),
+                        frd::forward<TailTupleLikes>(tail_tuple_likes)...
+                    )
+                );
+            }
         }()
     ) {
-        _apply_for_each(
-            frd::forward<Invocable>(invocable),
-            frd::forward<TupleLike>(tuple_like),
-            frd::make_index_sequence<tuple_size<TupleLike>>{}
-        );
-}
+        if constexpr (TupleSize > 0) {
+            _apply_for_each<0, tuple_size<HeadTupleLike>>(
+                frd::forward<Invocable>(invocable),
+                frd::forward<HeadTupleLike>(head_tuple_like),
+                frd::forward<TailTupleLikes>(tail_tuple_likes)...
+            );
+        }
+    }
 
     template<typename Invocable, typename TupleLike>
     concept applyable_for_each = requires(Invocable &&invocable, TupleLike &&tuple_like) {
@@ -416,7 +429,8 @@ namespace frd {
 
         Note also that the order of bases classes in the underlying data
         is not well-defined *by the standard*, but is well-defined by vendors.
-        The same does not apply to the order of construction.
+        The same does not apply to the order of construction, which is
+        well-defined by the standard.
     */
     template<typename... Elements>
     class tuple : public _tuple_base<Elements...> {
