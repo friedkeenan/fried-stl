@@ -585,9 +585,28 @@ namespace frd {
     template<typename First, typename Second>
     using pair = tuple<First, Second>;
 
-    /* TODO: 'noexcept' for 'tuple_convert'. */
+    template<typename OldElementsList, typename NewElementsList>
+    constexpr inline inert_type _tuple_convertible_to;
+
+    template<typename... OldElements, typename... NewElements>
+    constexpr inline bool _tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
+        convertible_to<OldElements, NewElements> && ...
+    );
+
+    template<typename OldElementsList, typename NewElementsList>
+    constexpr inline inert_type _nothrow_tuple_convertible_to;
+
+    template<typename... OldElements, typename... NewElements>
+    constexpr inline bool _nothrow_tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
+        nothrow_convertible_to<OldElements, NewElements> && ...
+    );
+
     template<typename... NewElements, tuple_like_with_size<sizeof...(NewElements)> OldTupleLike>
-    constexpr tuple<NewElements...> tuple_convert(OldTupleLike &&old_tuple_like) {
+    requires (_tuple_convertible_to<forwarding_tuple_elements<OldTupleLike>, type_list<NewElements...>>)
+    constexpr tuple<NewElements...> tuple_convert(OldTupleLike &&old_tuple_like)
+    noexcept(
+        _nothrow_tuple_convertible_to<forwarding_tuple_elements<OldTupleLike>, type_list<NewElements...>>
+    ) {
         return frd::apply([]<typename... Elements>(Elements &&... elements) {
             return tuple<NewElements...>{frd::forward<Elements>(elements)...};
         }, frd::forward<OldTupleLike>(old_tuple_like));

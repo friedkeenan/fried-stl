@@ -27,30 +27,33 @@ namespace frd {
     template<typename T, typename U>
     concept same_as_without_cvref = same_as_without_cv<remove_reference<T>, remove_reference<U>>;
 
+
     template<typename From, typename To>
-    concept implicitly_convertible_to = requires(void (&func)(To), From &&from) {
-        func(frd::forward<From>(from));
+    concept explicitly_convertible_to = requires {
+        static_cast<To>(frd::declval<From>());
     };
 
     template<typename From, typename To>
-    concept nothrow_implicitly_convertible_to = implicitly_convertible_to<From, To> &&
-        requires(void (&func)(To) noexcept, From &&from) {
-            requires noexcept(func(frd::forward<From>(from)));
-        };
+    concept nothrow_explicitly_convertible_to = (
+        explicitly_convertible_to<From, To> &&
+
+        noexcept(static_cast<To>(frd::declval<From>()))
+    );
 
     template<typename From, typename To>
     concept convertible_to = (
-        implicitly_convertible_to<From, To> &&
+        explicitly_convertible_to<From, To> &&
 
-        requires {
-            static_cast<To>(frd::declval<From>());
+        /* Can be implicitly converted as a parameter. */
+        requires(void (&func)(To), From &&from) {
+            func(frd::forward<From>(from));
         }
     );
 
     template<typename From, typename To>
     concept nothrow_convertible_to = (
         convertible_to<From, To>                    &&
-        nothrow_implicitly_convertible_to<From, To> &&
+        nothrow_explicitly_convertible_to<From, To> &&
 
         requires(void (&func)(To) noexcept, From &&from) {
             requires noexcept(func(frd::forward<From>(from)));

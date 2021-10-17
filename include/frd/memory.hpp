@@ -404,11 +404,11 @@ namespace frd {
             using Base::Base;
 
             template<typename U>
-            requires (implicitly_convertible_to<U *, pointer>)
+            requires (convertible_to<U *, pointer>)
             constexpr unique_ptr(unique_ptr<U> &&other) noexcept : Base(other.release()) { }
 
             template<typename U>
-            requires (implicitly_convertible_to<U *, pointer>)
+            requires (convertible_to<U *, pointer>)
             constexpr unique_ptr &operator =(unique_ptr<U> &&rhs) noexcept {
                 /* Only check if assigning to self if 'rhs' is of the same type. */
                 if constexpr (same_as<U, T>) {
@@ -460,11 +460,11 @@ namespace frd {
             using Base::Base;
 
             template<typename U>
-            requires (implicitly_convertible_to<U (*)[], T(*)[]>)
+            requires (convertible_to<U (*)[], T(*)[]>)
             constexpr unique_ptr(unique_ptr<U[]> &&other) noexcept : Base(other.release()) { }
 
             template<typename U>
-            requires (implicitly_convertible_to<U (*)[], T(*)[]>)
+            requires (convertible_to<U (*)[], T(*)[]>)
             constexpr unique_ptr &operator =(unique_ptr<U[]> &&rhs) noexcept {
                 /* Only check if assigning to self if 'rhs' is of the same type. */
                 if constexpr (same_as<U, T>) {
@@ -487,7 +487,7 @@ namespace frd {
             }
 
             template<typename U>
-            requires (implicitly_convertible_to<U (*)[], T (*)[]>)
+            requires (convertible_to<U (*)[], T (*)[]>)
             constexpr void reset(const U *ptr = nullptr) noexcept {
                 const auto old_ptr = frd::exchange(this->_ptr, ptr);
 

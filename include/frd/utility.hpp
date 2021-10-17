@@ -14,8 +14,8 @@
 namespace frd {
 
     template<typename T>
-    requires (implicitly_convertible_to<T, decay<T>>)
-    constexpr decay<T> decay_copy(T &&t) noexcept(nothrow_implicitly_convertible_to<T, decay<T>>) {
+    requires (convertible_to<T, decay<T>>)
+    constexpr decay<T> decay_copy(T &&t) noexcept(nothrow_convertible_to<T, decay<T>>) {
         return frd::forward<T>(t);
     }
 
