@@ -187,6 +187,11 @@ namespace frd {
             }
         }();
 
+    /*
+        We recursively increment the current index we're applying instead
+        of using 'frd::index_sequence' as that would introduce ambiguity with
+        expanding multiple parameter packs in one statement.
+    */
     template<frd::size_t I, frd::size_t N, typename Invocable, typename... TupleLikes>
     constexpr void _apply_for_each(Invocable &&invocable, TupleLikes &&... tuple_likes)
     noexcept(
@@ -250,16 +255,16 @@ namespace frd {
         }
     }
 
-    template<typename Invocable, typename TupleLike>
-    concept applyable_for_each = requires(Invocable &&invocable, TupleLike &&tuple_like) {
-        ::frd::apply_for_each(frd::forward<Invocable>(invocable), frd::forward<TupleLike>(tuple_like));
+    template<typename Invocable, typename... TupleLikes>
+    concept applyable_for_each = requires(Invocable &&invocable, TupleLikes &&... tuple_likes) {
+        ::frd::apply_for_each(frd::forward<Invocable>(invocable), frd::forward<TupleLikes>(tuple_likes)...);
     };
 
-    template<typename Invocable, typename TupleLike>
+    template<typename Invocable, typename... TupleLikes>
     concept nothrow_applyable_for_each = (
-        applyable_for_each<Invocable, TupleLike> &&
+        applyable_for_each<Invocable, TupleLikes...> &&
 
-        noexcept(frd::apply_for_each(frd::declval<Invocable>(), frd::declval<TupleLike>()))
+        noexcept(frd::apply_for_each(frd::declval<Invocable>(), frd::declval<TupleLikes>()...))
     );
 
     template<frd::size_t ElementIndex, typename Element>
