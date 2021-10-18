@@ -76,8 +76,11 @@ FRD_PLATFORM_USES_EXTENSION static_assert(frd::integral<unsigned __int128>);
 static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 
 static_assert(frd::tuple_like<frd::tuple<int>>);
-static_assert(frd::pair_like<frd::subrange<int *>>);
+static_assert(frd::tuple_like<frd::tuple<>>);
+static_assert(!frd::tuple_like<int>);
+
 static_assert(frd::pair_like<frd::pair<int, int>>);
+static_assert(frd::pair_like<frd::subrange<int *>>);
 
 static_assert(frd::view<frd::span<int, 2>>);
 static_assert(frd::same_as<frd::views::all_t<frd::span<int, 2>>, frd::span<int, 2>>);
@@ -179,6 +182,8 @@ static_assert(cuck());
 
 static_assert(frd::vector<int>() == frd::vector<int>());
 
+static_assert(frd::same_as<frd::type_list_concat<frd::type_list<int>, frd::type_list<char>>, frd::type_list<int, char>>);
+
 int main(int argc, char **argv) {
     frd::discard(argc, argv);
 
@@ -249,6 +254,10 @@ int main(int argc, char **argv) {
 
         frd::make_from_tuple<int>(frd::tuple{666})
     );
+
+    frd::apply([](int x, char c, frd::size_t s) {
+        std::printf("cat %d %c %ld\n", x, c, s);
+    }, frd::tuple_cat(frd::tuple{1, 'h'}, frd::tuple{64_sz}));
 
     return 0;
 }

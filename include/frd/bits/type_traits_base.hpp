@@ -99,17 +99,31 @@ namespace frd {
     template<typename T>
     using type_identity = typename type_holder<T>::type;
 
-    template<typename...>
-    struct type_list;
-
-    template<typename Head, typename... Tail>
-    struct type_list<Head, Tail...> {
-        using head = Head;
-        using tail = type_list<Tail...>;
+    template<typename... Types>
+    struct type_list {
+        template<typename... OtherTypes>
+        constexpr type_list<Types..., OtherTypes...> operator +(type_list<OtherTypes...>) const noexcept {
+            return {};
+        }
     };
 
+    template<typename... TypeLists>
+    struct _type_list_concat : type_holder<decltype((TypeLists{} + ...))> { };
+
     template<>
-    struct type_list<> { };
+    struct _type_list_concat<> : type_holder<type_list<>> { };
+
+    template<typename... TypeLists>
+    using type_list_concat = typename _type_list_concat<TypeLists...>::type;
+
+    template<template<typename...> typename Template, typename ArgsList>
+    struct _template_from_type_list;
+
+    template<template<typename...> typename Template, typename... Args>
+    struct _template_from_type_list<Template, type_list<Args...>> : type_holder<Template<Args...>> { };
+
+    template<template<typename...> typename Template, typename ArgsList>
+    using template_from_type_list = typename _template_from_type_list<Template, ArgsList>::type;
 
     template<typename T>
     struct _template_args;

@@ -134,6 +134,17 @@ namespace frd {
     template<tuple_like TupleLike>
     using forwarding_tuple_elements = typename _forwarding_tuple_elements<TupleLike, frd::make_index_sequence<tuple_size<TupleLike>>>::type;
 
+    template<typename TupleLike, typename Sequence>
+    struct _tuple_elements;
+
+    template<typename TupleLike, frd::size_t... Indices>
+    struct _tuple_elements<TupleLike, frd::index_sequence<Indices...>> {
+        using type = type_list<tuple_element<Indices,TupleLike>...>;
+    };
+
+    template<tuple_like TupleLike>
+    using tuple_elements = typename _tuple_elements<TupleLike, frd::make_index_sequence<tuple_size<TupleLike>>>::type;
+
     template<typename Invocable, typename TypeList>
     constexpr inline inert_type _invocable_with_tuple_like;
 
@@ -212,6 +223,10 @@ namespace frd {
         }()
     ) {
         if constexpr (N == 1) {
+            /*
+                If the size of the tuple-likes is 1, we can safely forward on 'invocable'
+                without worrying about use-after-forward issues since we're only using it once.
+            */
             frd::invoke(frd::forward<Invocable>(invocable), frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...);
         } else {
             frd::invoke(invocable, frd::get<I>(frd::forward<TupleLikes>(tuple_likes))...);
@@ -237,7 +252,7 @@ namespace frd {
                 return true;
             } else {
                 return noexcept(
-                    _apply_for_each<0, tuple_size<HeadTupleLike>>(
+                    _apply_for_each<0, TupleSize>(
                         frd::forward<Invocable>(invocable),
                         frd::forward<HeadTupleLike>(head_tuple_like),
                         frd::forward<TailTupleLikes>(tail_tuple_likes)...
@@ -610,6 +625,89 @@ namespace frd {
         return frd::apply([]<typename... Elements>(Elements &&... elements) {
             return tuple<NewElements...>{frd::forward<Elements>(elements)...};
         }, frd::forward<OldTupleLike>(old_tuple_like));
+    }
+
+    template<typename... TupleLikes>
+    struct _indices_for_head_tuple;
+
+    template<typename HeadTupleLike, typename... TailTupleLikes>
+    struct _indices_for_head_tuple<HeadTupleLike, TailTupleLikes...> : constant_holder<frd::make_index_sequence<tuple_size<HeadTupleLike>>{}> { };
+
+    template<>
+    struct _indices_for_head_tuple<> : constant_holder<frd::index_sequence<>{}> { };
+
+    template<typename ReturnTuple, typename... TupleLikes>
+    struct _tuple_cat;
+
+    /*
+        We separate the tuple-likes from the function call to
+        allow multiple parameter packs in function parameters.
+    */
+    template<typename ReturnTuple, typename HeadTupleLike, typename... TailTupleLikes>
+    struct _tuple_cat<ReturnTuple, HeadTupleLike, TailTupleLikes...> {
+        template<frd::size_t... HeadIndices, typename... UnwrappedElements>
+        static constexpr ReturnTuple concatenate(
+            frd::index_sequence<HeadIndices...>,
+
+            HeadTupleLike &&head_tuple_like,
+            TailTupleLikes &&... tail_tuple_likes,
+
+            UnwrappedElements &&... unwrapped_elements
+        ) {
+            return _tuple_cat<ReturnTuple, TailTupleLikes...>::concatenate(
+                _indices_for_head_tuple<TailTupleLikes...>::value,
+
+                frd::forward<TailTupleLikes>(tail_tuple_likes)...,
+
+                frd::forward<UnwrappedElements>(unwrapped_elements)...,
+
+                frd::get<HeadIndices>(frd::forward<HeadTupleLike>(head_tuple_like))...
+            );
+        }
+    };
+
+    template<typename ReturnTuple>
+    struct _tuple_cat<ReturnTuple> {
+        template<typename... UnwrappedElements>
+        static constexpr ReturnTuple concatenate(frd::index_sequence<>, UnwrappedElements &&... unwrapped_elements) {
+            return {frd::forward<UnwrappedElements>(unwrapped_elements)...};
+        }
+    };
+
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_type _tuple_elements_forwardable;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _tuple_elements_forwardable<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        convertible_to<ElementsFwd, Elements> && ...
+    );
+
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_type _nothrow_tuple_elements_forwardable;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _nothrow_tuple_elements_forwardable<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        nothrow_convertible_to<ElementsFwd, Elements> && ...
+    );
+
+    template<
+        tuple_like... TupleLikes,
+
+        typename ElementsList    = type_list_concat<tuple_elements<TupleLikes>...>,
+        typename ElementsFwdList = type_list_concat<forwarding_tuple_elements<TupleLikes>...>,
+
+        typename ReturnTuple = template_from_type_list<tuple, ElementsList>
+    >
+    requires (_tuple_elements_forwardable<ElementsList, ElementsFwdList>)
+    constexpr ReturnTuple tuple_cat(TupleLikes &&... tuple_likes)
+    noexcept(
+        (_nothrow_tuple_elements_forwardable<ElementsList, ElementsFwdList>)
+    ) {
+        return _tuple_cat<ReturnTuple, TupleLikes...>::concatenate(
+            _indices_for_head_tuple<TupleLikes...>::value,
+
+            frd::forward<TupleLikes>(tuple_likes)...
+        );
     }
 
 }
