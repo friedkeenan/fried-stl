@@ -176,7 +176,7 @@ namespace frd {
 
         /* Have different types and underlying invocables depending on 'NumCycles'. */
         template<frd::size_t NumCycles = dynamic_extent>
-        constexpr inline inert_type cycle;
+        constexpr inline inert_t cycle;
 
         template<frd::size_t NumCycles>
         requires (NumCycles == dynamic_extent)

@@ -358,7 +358,7 @@ namespace frd {
     );
 
     template<range R>
-    using borrowed_iterator = conditional<borrowed_range<R>, range_iterator<R>, inert_type>;
+    using borrowed_iterator = conditional<borrowed_range<R>, range_iterator<R>, inert_t>;
 
 }
 

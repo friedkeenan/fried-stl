@@ -104,7 +104,7 @@ namespace frd {
     concept nothrow_getable = getable<T, I> && noexcept(frd::get<I>(frd::declval<T>()));
 
     template<typename TupleLike, typename Sequence>
-    constexpr inline inert_type _has_tuple_elements;
+    constexpr inline inert_t _has_tuple_elements;
 
     template<typename TupleLike, frd::size_t... Indices>
     constexpr inline bool _has_tuple_elements<TupleLike, frd::index_sequence<Indices...>> = (
@@ -146,7 +146,7 @@ namespace frd {
     using tuple_elements = typename _tuple_elements<TupleLike, frd::make_index_sequence<tuple_size<TupleLike>>>::type;
 
     template<typename Invocable, typename TypeList>
-    constexpr inline inert_type _invocable_with_tuple_like;
+    constexpr inline inert_t _invocable_with_tuple_like;
 
     template<typename Invocable, typename... Elements>
     constexpr inline bool _invocable_with_tuple_like<Invocable, type_list<Elements...>> = invocable<Invocable, Elements...>;
@@ -283,7 +283,7 @@ namespace frd {
     );
 
     template<typename T, typename ElementsList>
-    constexpr inline inert_type _constructible_from_tuple_elements;
+    constexpr inline inert_t _constructible_from_tuple_elements;
 
     template<typename T, typename... Elements>
     constexpr inline bool _constructible_from_tuple_elements<T, type_list<Elements...>> = (
@@ -432,7 +432,7 @@ namespace frd {
     struct _tuple_base : _make_tuple_base<frd::make_index_sequence<sizeof...(Elements)>, Elements...>::type { };
 
     template<typename ElementsList, typename ElementsFwdList>
-    constexpr inline inert_type _tuple_assignable_from;
+    constexpr inline inert_t _tuple_assignable_from;
 
     template<typename... Elements, typename... ElementsFwd>
     constexpr inline bool _tuple_assignable_from<type_list<Elements...>, type_list<ElementsFwd...>> = (
@@ -440,7 +440,7 @@ namespace frd {
     );
 
     template<typename ElementsList, typename ElementsFwdList>
-    constexpr inline inert_type _nothrow_tuple_assignable_from;
+    constexpr inline inert_t _nothrow_tuple_assignable_from;
 
     template<typename... Elements, typename... ElementsFwd>
     constexpr inline bool _nothrow_tuple_assignable_from<type_list<Elements...>, type_list<ElementsFwd...>> = (
@@ -448,7 +448,7 @@ namespace frd {
     );
 
     template<typename ElementsList, typename CmpElementsList>
-    constexpr inline inert_type _tuple_comparable_with;
+    constexpr inline inert_t _tuple_comparable_with;
 
     template<typename... Elements, typename... CmpElements>
     constexpr inline bool _tuple_comparable_with<type_list<Elements...>, type_list<CmpElements...>> = (
@@ -456,7 +456,7 @@ namespace frd {
     );
 
     template<typename ElementsList, typename CmpElementsList>
-    constexpr inline inert_type _nothrow_tuple_comparable;
+    constexpr inline inert_t _nothrow_tuple_comparable;
 
     template<typename... Elements, typename... CmpElements>
     constexpr inline bool _nothrow_tuple_comparable<type_list<Elements...>, type_list<CmpElements...>> = (
@@ -636,8 +636,18 @@ namespace frd {
     template<typename First, typename Second>
     using pair = tuple<First, Second>;
 
+    template<typename... Args>
+    constexpr tuple<Args &&...> forward_as_tuple(Args &&... args) noexcept {
+        return {frd::forward<Args>(args)...};
+    }
+
+    template<typename... Args>
+    constexpr tuple<Args &...> tie(Args &... args) noexcept {
+        return {args...};
+    }
+
     template<typename OldElementsList, typename NewElementsList>
-    constexpr inline inert_type _tuple_convertible_to;
+    constexpr inline inert_t _tuple_convertible_to;
 
     template<typename... OldElements, typename... NewElements>
     constexpr inline bool _tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
@@ -645,7 +655,7 @@ namespace frd {
     );
 
     template<typename OldElementsList, typename NewElementsList>
-    constexpr inline inert_type _nothrow_tuple_convertible_to;
+    constexpr inline inert_t _nothrow_tuple_convertible_to;
 
     template<typename... OldElements, typename... NewElements>
     constexpr inline bool _nothrow_tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
@@ -711,7 +721,7 @@ namespace frd {
     };
 
     template<typename ElementsList, typename ElementsFwdList>
-    constexpr inline inert_type _tuple_elements_forwardable;
+    constexpr inline inert_t _tuple_elements_forwardable;
 
     template<typename... Elements, typename... ElementsFwd>
     constexpr inline bool _tuple_elements_forwardable<type_list<Elements...>, type_list<ElementsFwd...>> = (
@@ -719,7 +729,7 @@ namespace frd {
     );
 
     template<typename ElementsList, typename ElementsFwdList>
-    constexpr inline inert_type _nothrow_tuple_elements_forwardable;
+    constexpr inline inert_t _nothrow_tuple_elements_forwardable;
 
     template<typename... Elements, typename... ElementsFwd>
     constexpr inline bool _nothrow_tuple_elements_forwardable<type_list<Elements...>, type_list<ElementsFwd...>> = (

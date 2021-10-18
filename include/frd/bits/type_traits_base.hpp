@@ -470,17 +470,26 @@ namespace frd {
     using member_pointer_class = typename _member_pointer_class<remove_cv<T>>::type;
 
     /* TODO: Should this be in 'type_traits'? */
-    struct inert_type {
-        constexpr inert_type() noexcept = default;
+    struct inert_t {
+        constexpr inert_t() = default;
 
         template<typename... Args>
-        constexpr inert_type(Args &&... args) noexcept {
+        constexpr inert_t(Args &&... args) noexcept {
             frd::discard(args...);
+        }
+
+        template<typename T>
+        constexpr const inert_t &operator =(T &&t) const noexcept {
+            frd::discard(t);
+
+            return *this;
         }
     };
 
+    constexpr inline inert_t inert;
+
     template<bool IsPresent, typename T>
-    using maybe_present = conditional<IsPresent, T, inert_type>;
+    using maybe_present = conditional<IsPresent, T, inert_t>;
 
     template<bool Const, typename T>
     using maybe_const = conditional<Const, const T, T>;
