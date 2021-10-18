@@ -259,5 +259,18 @@ int main(int argc, char **argv) {
         std::printf("cat %d %c %ld\n", x, c, s);
     }, frd::tuple_cat(frd::tuple{1, 'h'}, frd::tuple{64_sz}));
 
+    constexpr auto assigned = []() {
+        auto to_assign = frd::tuple{1, 2};
+        to_assign = frd::tuple{3, 'h'};
+
+        return to_assign;
+    }();
+
+    static_assert(assigned == frd::tuple{3, 104});
+
+    frd::apply([](int x, int y) {
+        std::printf("assign %d %d\n", x, y);
+    }, assigned);
+
     return 0;
 }

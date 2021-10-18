@@ -431,14 +431,28 @@ namespace frd {
     template<typename... Elements>
     struct _tuple_base : _make_tuple_base<frd::make_index_sequence<sizeof...(Elements)>, Elements...>::type { };
 
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_type _tuple_assignable_from;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _tuple_assignable_from<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        assignable_from<Elements, ElementsFwd> && ...
+    );
+
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_type _nothrow_tuple_assignable_from;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _nothrow_tuple_assignable_from<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        nothrow_assignable_from<Elements, ElementsFwd> && ...
+    );
+
     template<typename ElementsList, typename CmpElementsList>
-    constexpr inline inert_type _is_tuple_comparable;
+    constexpr inline inert_type _tuple_comparable_with;
 
     template<typename... Elements, typename... CmpElements>
-    constexpr inline bool _is_tuple_comparable<type_list<Elements...>, type_list<CmpElements...>> = (
-        (sizeof...(Elements) == sizeof...(CmpElements)) &&
-
-        (synthetic_three_way_comparable_with<Elements, CmpElements> && ...)
+    constexpr inline bool _tuple_comparable_with<type_list<Elements...>, type_list<CmpElements...>> = (
+        synthetic_three_way_comparable_with<Elements, CmpElements> && ...
     );
 
     template<typename ElementsList, typename CmpElementsList>
@@ -474,18 +488,40 @@ namespace frd {
     template<typename... Elements>
     class tuple : public _tuple_base<Elements...> {
         public:
+            static constexpr frd::size_t NumElements = sizeof...(Elements);
+
             /*
                 NOTE: All our special member functions are implicitly
                 defined, and therefore trivial if possible.
             */
 
-            /* TODO: 'swap' method and assignment operator. */
+            /* TODO: 'swap' method. */
+
+            template<typename TupleLike, frd::size_t... Indices>
+            constexpr void _assign(TupleLike &&tuple_like, frd::index_sequence<Indices...>) {
+                ((this->template get<Indices>() = frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...);
+            }
+
+            template<tuple_like_with_size<NumElements> TupleLike>
+            requires (
+                !same_as<remove_cvref<TupleLike>, tuple> &&
+
+                _tuple_assignable_from<type_list<Elements &...>, forwarding_tuple_elements<TupleLike>>
+            )
+            constexpr tuple &operator =(TupleLike &&tuple_like)
+            noexcept(
+                _nothrow_tuple_assignable_from<type_list<Elements &...>, forwarding_tuple_elements<TupleLike>>
+            ) {
+                this->_assign(frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<NumElements>{});
+
+                return *this;
+            }
 
             template<typename Self, typename Invocable>
             static constexpr auto _transform(Self &&self, Invocable &&invocable)
             noexcept(
                 []() {
-                    using RealInvocable = conditional<sizeof...(Elements) <= 1, Invocable, Invocable &>;
+                    using RealInvocable = conditional<NumElements <= 1, Invocable, Invocable &>;
 
                     return (
                         (nothrow_invocable<Invocable, match_cvref<Self, Elements>> && ...) &&
@@ -502,7 +538,7 @@ namespace frd {
                     );
                 }()
             ) {
-                using RealInvocable = conditional<sizeof...(Elements) <= 1, Invocable, Invocable &>;
+                using RealInvocable = conditional<NumElements <= 1, Invocable, Invocable &>;
 
                 /*
                     Without specifying template arguments, the compiler assumes
@@ -512,7 +548,7 @@ namespace frd {
                 using Return = tuple<invoke_result<RealInvocable, match_cvref<Self, Elements>>...>;
 
                 return frd::apply([&]<typename... ElementsFwd>(ElementsFwd &&... elements) {
-                    if constexpr (sizeof...(Elements) <= 1) {
+                    if constexpr (NumElements <= 1) {
                         return Return{frd::invoke(frd::forward<Invocable>(invocable), frd::forward<ElementsFwd>(elements))...};
                     } else {
                         return Return{frd::invoke(invocable, frd::forward<ElementsFwd>(elements))...};
@@ -561,7 +597,7 @@ namespace frd {
             constexpr auto _compare_recurse(const RhsTupleLike &rhs) const {
                 const auto cmp = frd::synthetic_three_way_compare(this->template get<I>(), frd::get<I>(rhs));
 
-                if constexpr (I < sizeof...(Elements) - 1) {
+                if constexpr (I < NumElements - 1) {
                     if (cmp != 0) {
                         return cmp;
                     }
@@ -572,8 +608,8 @@ namespace frd {
                 }
             }
 
-            template<tuple_like_with_size<sizeof...(Elements)> RhsTupleLike>
-            requires (_is_tuple_comparable<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>)
+            template<tuple_like_with_size<NumElements> RhsTupleLike>
+            requires (_tuple_comparable_with<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>)
             constexpr auto operator <=>(const RhsTupleLike &rhs) const
             noexcept(
                 _nothrow_tuple_comparable<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>
@@ -581,8 +617,8 @@ namespace frd {
                 return this->template _compare_recurse<0>(rhs);
             }
 
-            template<tuple_like_with_size<sizeof...(Elements)> RhsTupleLike>
-            requires (_is_tuple_comparable<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>)
+            template<tuple_like_with_size<NumElements> RhsTupleLike>
+            requires (_tuple_comparable_with<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>)
             constexpr bool operator ==(const RhsTupleLike &rhs) const
             noexcept(
                 _nothrow_tuple_comparable<type_list<const Elements &...>, forwarding_tuple_elements<const RhsTupleLike &>>
@@ -605,7 +641,7 @@ namespace frd {
 
     template<typename... OldElements, typename... NewElements>
     constexpr inline bool _tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
-        convertible_to<OldElements, NewElements> && ...
+        explicitly_convertible_to<OldElements, NewElements> && ...
     );
 
     template<typename OldElementsList, typename NewElementsList>
@@ -613,7 +649,7 @@ namespace frd {
 
     template<typename... OldElements, typename... NewElements>
     constexpr inline bool _nothrow_tuple_convertible_to<type_list<OldElements...>, type_list<NewElements...>> = (
-        nothrow_convertible_to<OldElements, NewElements> && ...
+        nothrow_explicitly_convertible_to<OldElements, NewElements> && ...
     );
 
     template<typename... NewElements, tuple_like_with_size<sizeof...(NewElements)> OldTupleLike>
@@ -623,7 +659,7 @@ namespace frd {
         _nothrow_tuple_convertible_to<forwarding_tuple_elements<OldTupleLike>, type_list<NewElements...>>
     ) {
         return frd::apply([]<typename... Elements>(Elements &&... elements) {
-            return tuple<NewElements...>{frd::forward<Elements>(elements)...};
+            return tuple{static_cast<NewElements>(frd::forward<Elements>(elements))...};
         }, frd::forward<OldTupleLike>(old_tuple_like));
     }
 
