@@ -82,6 +82,8 @@ static_assert(!frd::tuple_like<int>);
 static_assert(frd::pair_like<frd::pair<int, int>>);
 static_assert(frd::pair_like<frd::subrange<int *>>);
 
+static_assert(frd::nothrow_swappable_with<frd::tuple<int, int>, frd::tuple<char, char>>);
+
 static_assert(frd::view<frd::span<int, 2>>);
 static_assert(frd::same_as<frd::views::all_t<frd::span<int, 2>>, frd::span<int, 2>>);
 

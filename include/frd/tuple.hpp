@@ -447,6 +447,22 @@ namespace frd {
         nothrow_assignable_from<Elements, ElementsFwd> && ...
     );
 
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_t _tuple_swappable_with;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _tuple_swappable_with<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        swappable_with<Elements, ElementsFwd> && ...
+    );
+
+    template<typename ElementsList, typename ElementsFwdList>
+    constexpr inline inert_t _nothrow_tuple_swappable_with;
+
+    template<typename... Elements, typename... ElementsFwd>
+    constexpr inline bool _nothrow_tuple_swappable_with<type_list<Elements...>, type_list<ElementsFwd...>> = (
+        nothrow_swappable_with<Elements, ElementsFwd> && ...
+    );
+
     template<typename ElementsList, typename CmpElementsList>
     constexpr inline inert_t _tuple_comparable_with;
 
@@ -495,8 +511,6 @@ namespace frd {
                 defined, and therefore trivial if possible.
             */
 
-            /* TODO: 'swap' method. */
-
             template<typename TupleLike, frd::size_t... Indices>
             constexpr void _assign(TupleLike &&tuple_like, frd::index_sequence<Indices...>) {
                 ((this->template get<Indices>() = frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...);
@@ -515,6 +529,30 @@ namespace frd {
                 this->_assign(frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<NumElements>{});
 
                 return *this;
+            }
+
+            template<typename TupleLike, frd::size_t... Indices>
+            constexpr void _swap(TupleLike &&tuple_like, frd::index_sequence<Indices...>) {
+                (frd::swap(this->template get<Indices>(), frd::get<Indices>(frd::forward<TupleLike>(tuple_like))), ...);
+            }
+
+            template<tuple_like_with_size<NumElements> TupleLike>
+            requires (_tuple_swappable_with<type_list<Elements &...>, forwarding_tuple_elements<TupleLike>>)
+            constexpr void swap(TupleLike &&tuple_like)
+            noexcept(
+                _nothrow_tuple_swappable_with<type_list<Elements &...>, forwarding_tuple_elements<TupleLike>>
+            ) {
+                this->_swap(frd::forward<TupleLike>(tuple_like), frd::make_index_sequence<NumElements>{});
+            }
+
+            /* ADL-discovered swap. */
+            template<tuple_like_with_size<NumElements> TupleLike>
+            requires (_tuple_swappable_with<type_list<Elements &...>, forwarding_tuple_elements<TupleLike>>)
+            friend constexpr void swap(tuple &lhs, TupleLike &&rhs)
+            noexcept(
+                noexcept(lhs.swap(frd::forward<TupleLike>(rhs)))
+            ) {
+                lhs.swap(frd::forward<TupleLike>(rhs));
             }
 
             template<typename Self, typename Invocable>
