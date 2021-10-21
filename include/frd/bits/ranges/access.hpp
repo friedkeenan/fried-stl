@@ -37,7 +37,6 @@ namespace frd {
 
     }
 
-    /* Needs to be a callable object for ADL lookup to be checked. */
     struct _begin_fn {
         template<_maybe_borrowed_range R>
         requires (_range_array<R> || _member_begin<R> || _adl::_adl_begin<R>)
@@ -91,7 +90,6 @@ namespace frd {
 
     }
 
-    /* Needs to be a callable object for ADL lookup to be checked. */
     struct _end_fn {
         template<_maybe_borrowed_range R>
         requires (_range_array<R> || _member_end<R> || _adl::_adl_end<R>)
@@ -253,7 +251,6 @@ namespace frd {
     template<typename R>
     concept _iterator_size = forward_range<R> && sized_sentinel_for<range_sentinel<R>, range_iterator<R>>;
 
-    /* Needs to be a callable object for ADL lookup to be checked. */
     struct _size_fn {
         template<range R>
         requires (

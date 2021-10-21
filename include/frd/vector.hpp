@@ -41,15 +41,50 @@ namespace frd {
 
             static constexpr size_type NewCapacityRatio = 2;
 
+            [[no_unique_address]] Allocator _allocator = Allocator();
+
             pointer   _data     = nullptr;
             size_type _size     = 0;
             size_type _capacity = 0;
 
-            [[no_unique_address]] Allocator _allocator = Allocator();
-
             constexpr vector() requires (default_initializable<Allocator>) = default;
 
             constexpr explicit vector(const Allocator &alloc) noexcept : _allocator(alloc) { }
+
+            constexpr vector(const size_type size, const Element &value, const Allocator &alloc = Allocator())
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) : _allocator(alloc), _data(_allocator_traits::allocate(this->_allocator, size)), _size(size), _capacity(size) {
+                for (const auto i : interval(size)) {
+                    _allocator_traits::construct(this->_allocator, this->_data + i, value);
+                }
+            }
+
+            constexpr explicit vector(const size_type size, const Allocator &alloc = Allocator())
+            requires (
+                allocator_value_default_constructible<Allocator>
+            ) : _allocator(alloc), _data(_allocator_traits::allocate(this->_allocator, size)), _size(size), _capacity(size) {
+                for (const auto i : interval(size)) {
+                    _allocator_traits::construct(this->_allocator, this->_data + i);
+                }
+            }
+
+            template<input_range R>
+            requires (
+                /* Stops ambiguity with copy/move constructors. */
+                !same_as<remove_cvref<R>, vector> &&
+
+                same_as<remove_cvref<range_reference<R>>, Element>                &&
+                allocator_value_constructible_from<Allocator, range_reference<R>>
+            )
+            constexpr explicit vector(R &&r, const Allocator &alloc = Allocator()) : _allocator(alloc) {
+                /* TODO: Potentially allocate data with member initializers? */
+                this->insert(this->begin(), frd::forward<R>(r));
+            }
+
+            constexpr explicit vector(const std::initializer_list<Element> list, const Allocator &alloc = Allocator()) : _allocator(alloc) {
+                this->insert(this->begin(), list);
+            }
 
             constexpr ~vector() {
                 this->_cleanup_data();
@@ -183,9 +218,9 @@ namespace frd {
                 const auto insert_offset = pos - this->begin();
 
                 if (this->_capacity == 0) {
-                    /* Use '_reserve_impl' to avoid capacity checks. */
+                    /* Call guarded 'reserve' to ensure we don't allocate a zero-length array. */
 
-                    this->_reserve_impl(insert_size);
+                    this->reserve(insert_size);
                 } else if (this->_size + insert_size > this->_capacity) {
                     /* The normal exponential reallocation could still be too small for the insertion. */
                     const auto new_capacity = frd::max(NewCapacityRatio * this->_capacity, this->_size + insert_size);
@@ -212,6 +247,8 @@ namespace frd {
             template<typename... Args>
             requires (allocator_value_constructible_from<Allocator, Args...>)
             constexpr iterator emplace(const const_iterator pos, Args &&... args) {
+                frd::precondition(pos >= this->begin() && pos <= this->end(), "Invalid iterator for insertion!");
+
                 const auto insert_it = this->_make_space_for_insertion(pos, 1);
 
                 /* Emplace the element into the empty location we have made for it. */
@@ -248,20 +285,36 @@ namespace frd {
             template<typename R>
             /* Requirements checked by callers. */
             constexpr iterator _insert_range(const const_iterator pos, R &&insert_rng) {
-                const auto insert_size = frd::size(insert_rng);
-                const auto insert_it   = this->_make_space_for_insertion(pos, insert_size);
+                /*
+                    If 'R' is a sized range, then we can make sure we have enough space
+                    before inserting. Otherwise insert each element individually.
+                */
+                if constexpr (sized_range<R>) {
+                    const auto insert_size = frd::size(insert_rng);
+                    const auto insert_it   = this->_make_space_for_insertion(pos, insert_size);
 
-                /* Insert the elements of the range into the empty locations we have made for it. */
-                auto insert_location = pointer{insert_it};
-                for (auto &&to_insert : insert_rng) {
-                    _allocator_traits::construct(this->_allocator, insert_location, frd::forward<decltype(to_insert)>(to_insert));
+                    /* Insert the elements of the range into the empty locations we have made for it. */
+                    auto insert_location = pointer{insert_it};
+                    for (auto &&to_insert : insert_rng) {
+                        _allocator_traits::construct(this->_allocator, insert_location, frd::forward<decltype(to_insert)>(to_insert));
 
-                    insert_location++;
+                        insert_location++;
+                    }
+
+                    this->_size += insert_size;
+
+                    return insert_it;
+                } else {
+                    size_type insert_offset = pos - this->begin();
+
+                    for (auto &&to_insert : frd::forward<R>(insert_rng)) {
+                        this->insert(this->begin() + insert_offset, frd::forward<decltype(to_insert)>(to_insert));
+
+                        insert_offset++;
+                    }
+
+                    return this->begin() + insert_offset;
                 }
-
-                this->_size += insert_size;
-
-                return insert_it;
             }
 
             constexpr iterator insert(const const_iterator pos, const std::initializer_list<Element> list)
@@ -271,7 +324,7 @@ namespace frd {
                 return this->_insert_range(pos, list);
             }
 
-            template<sized_range R>
+            template<input_range R>
             requires (
                 /*
                     Stops ambiguity between single element overload and this one.
@@ -281,7 +334,6 @@ namespace frd {
                 */
                 !forwarder_for<R, Element> &&
 
-                input_range<R>                                                    &&
                 same_as<remove_cvref<range_reference<R>>, Element>                &&
                 allocator_value_constructible_from<Allocator, range_reference<R>>
             )

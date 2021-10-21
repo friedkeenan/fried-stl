@@ -48,8 +48,6 @@ namespace frd {
         };
 
         /*
-            Needs to be a callable object for ADL lookup to be checked.
-
             'I' needs to be a specifiable template parameter, and so
             cannot just be for the call operator, but rather the whole type.
 
@@ -201,7 +199,7 @@ namespace frd {
     /*
         We recursively increment the current index we're applying instead
         of using 'frd::index_sequence' as that would introduce ambiguity with
-        expanding multiple parameter packs in one statement.
+        expanding multiple parameter packs in one expression.
     */
     template<frd::size_t I, frd::size_t N, typename Invocable, typename... TupleLikes>
     constexpr void _apply_for_each(Invocable &&invocable, TupleLikes &&... tuple_likes)
@@ -553,6 +551,20 @@ namespace frd {
                 noexcept(lhs.swap(frd::forward<TupleLike>(rhs)))
             ) {
                 lhs.swap(frd::forward<TupleLike>(rhs));
+            }
+
+            /* Commutative ADL-discovered swap. */
+            template<tuple_like_with_size<NumElements> TupleLike>
+            requires (
+                !template_specialization_of<remove_cvref<TupleLike>, tuple> &&
+
+                _tuple_swappable_with<forwarding_tuple_elements<TupleLike>, type_list<Elements &...>>
+            )
+            friend constexpr void swap(TupleLike &&lhs, tuple &rhs)
+            noexcept(
+                noexcept(rhs.swap(frd::forward<TupleLike>(lhs)))
+            ) {
+                rhs.swap(frd::forward<TupleLike>(lhs));
             }
 
             template<typename Self, typename Invocable>

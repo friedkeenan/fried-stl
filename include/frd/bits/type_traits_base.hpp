@@ -68,6 +68,12 @@ namespace frd {
     template<typename T>                constexpr inline bool is_bound_array       = false;
     template<typename T, frd::size_t N> constexpr inline bool is_bound_array<T[N]> = true;
 
+    template<typename T, template<typename...> typename Template>
+    constexpr inline bool is_template_specialization_of = false;
+
+    template<template<typename...> typename Template, typename... Ts>
+    constexpr inline bool is_template_specialization_of<Template<Ts...>, Template> = true;
+
     template<typename T>                        constexpr inline bool _is_member_pointer                    = false;
     template<typename MemberType, typename Cls> constexpr inline bool _is_member_pointer<MemberType Cls::*> = true;
 
@@ -324,11 +330,13 @@ namespace frd {
     template<typename T> struct _make_signed   : type_holder<T> { };
     template<typename T> struct _make_unsigned : type_holder<T> { };
 
-    #define ADD_SIGNEDNESS(cls)                                                \
+    template<> struct _make_signed<unsigned char> : type_holder<signed char> { };
+    template<> struct _make_unsigned<signed char> : type_holder<unsigned char> { };
+
+    #define ADD_SIGNEDNESS(cls)                                                                            \
         FRD_PLATFORM_USES_EXTENSION template<> struct _make_signed  <cls> : type_holder<  signed cls> { }; \
         FRD_PLATFORM_USES_EXTENSION template<> struct _make_unsigned<cls> : type_holder<unsigned cls> { }
 
-    ADD_SIGNEDNESS(char);
     ADD_SIGNEDNESS(short);
     ADD_SIGNEDNESS(int);
     ADD_SIGNEDNESS(long);
@@ -383,6 +391,7 @@ namespace frd {
         template<> struct _make_signed<cls>   : type_holder<_ranked_int_with_same_size <cls>> { }; \
         template<> struct _make_unsigned<cls> : type_holder<_ranked_uint_with_same_size<cls>> { }
 
+    ADD_RANKED_SIGNEDNESS(char);
     ADD_RANKED_SIGNEDNESS(wchar_t);
     ADD_RANKED_SIGNEDNESS(char8_t);
     ADD_RANKED_SIGNEDNESS(char16_t);

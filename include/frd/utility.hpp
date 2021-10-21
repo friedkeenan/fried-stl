@@ -60,7 +60,6 @@ namespace frd {
         TODO: Make implementation of 'std::ranges::swap'?
     */
 
-    /* Needs to be a callable object for ADL lookup to be checked. */
     struct _swap_fn {
         template<typename LHS, typename RHS>
         requires (_adl::_adl_swap<LHS, RHS> || _normal_swappable<LHS, RHS>)

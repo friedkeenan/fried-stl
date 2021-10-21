@@ -205,6 +205,9 @@ namespace frd {
         sizeof(T);
     };
 
+    template<typename T, template<typename...> typename Template>
+    concept template_specialization_of = is_template_specialization_of<T, Template>;
+
     template<typename From, typename To>
     concept qualification_convertible_to = (
         same_as_without_cvref<From, To> &&

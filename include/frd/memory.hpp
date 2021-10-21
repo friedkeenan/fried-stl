@@ -438,6 +438,10 @@ namespace frd {
                 }
             }
 
+            friend constexpr void swap(unique_ptr &lhs, unique_ptr &rhs) noexcept {
+                lhs.swap(rhs);
+            }
+
             [[nodiscard]]
             constexpr reference operator *() const noexcept(noexcept(*frd::declval<pointer>())) {
                 return *this->_ptr;
@@ -504,21 +508,14 @@ namespace frd {
                 this->_ptr = nullptr;
             }
 
+            friend constexpr void swap(unique_ptr &lhs, unique_ptr &rhs) noexcept {
+                lhs.swap(rhs);
+            }
+
             constexpr reference operator [](frd::size_t index) const {
                 return this->_ptr[index];
             }
     };
-
-    /*
-        ADL-discovered swap.
-
-        Have this outside the class to handle both the primary and array templates,
-        and because it cannot be put in '_unique_pointer_impl'.
-    */
-    template<typename T>
-    constexpr void swap(unique_ptr<T> &lhs, unique_ptr<T> &rhs) noexcept {
-        lhs.swap(rhs);
-    }
 
     template<typename T, typename... Args>
     requires (!array_type<T> && constructible_from<T, Args...>)
@@ -702,17 +699,17 @@ namespace frd {
             }
     };
 
-    template<typename T, typename Allocator, typename... Args>
-    requires (constructible_from<T, Args...>)
+    template<typename T, allocator_for<T> Allocator, typename... Args>
+    requires (allocator_value_constructible_from<Allocator, Args...>)
     constexpr scoped_ptr<T, Allocator> make_scoped_with_allocator(Allocator alloc, Args &&... args) {
         const auto ptr = allocator_traits<Allocator>::allocate(alloc, 1);
         allocator_traits<Allocator>::construct(alloc, ptr, frd::forward<Args>(args)...);
 
-        return scoped_ptr<T, Allocator>(ptr, alloc);
+        return scoped_ptr<T, Allocator>(ptr, frd::move(alloc));
     }
 
     template<typename T, default_initializable Allocator = allocator<T>, typename... Args>
-    requires (constructible_from<T, Args...>)
+    requires (allocator_for<Allocator, T> && allocator_value_constructible_from<Allocator, Args...>)
     constexpr scoped_ptr<T, Allocator> make_scoped(Args &&... args) {
         return make_scoped_with_allocator<T, Allocator>(Allocator(), frd::forward<Args>(args)...);
     }
