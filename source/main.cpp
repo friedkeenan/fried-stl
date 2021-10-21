@@ -186,6 +186,10 @@ static_assert(frd::vector<int>() == frd::vector<int>());
 
 static_assert(frd::same_as<frd::type_list_concat<frd::type_list<int>, frd::type_list<char>>, frd::type_list<int, char>>);
 
+constexpr inline auto arr = frd::array<int, 0>{};
+
+static_assert(arr.data() == nullptr);
+
 int main(int argc, char **argv) {
     frd::discard(argc, argv);
 

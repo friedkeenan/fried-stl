@@ -13,8 +13,46 @@
 
 namespace frd {
 
+    /*
+        We have different types for '_elems' attribute depending if 'Size' is 0,
+        because zero-size arrays are not standard-compliant, and additionally we
+        need an array-like object in that case for decaying to a pointer and
+        subscripting, which doesn't make sense for 'inert_t'.
+    */
     template<typename Element, frd::size_t Size>
-    class array {
+    struct _array_elems {
+        Element _elems[Size];
+    };
+
+    template<typename Element>
+    struct _array_elems<Element, 0> {
+        struct array_like {
+            constexpr Element *operator +(const ptrdiff_t delta) const noexcept {
+                frd::discard(delta);
+
+                return nullptr;
+            }
+
+            constexpr Element &operator [](const ptrdiff_t delta) noexcept {
+                frd::discard(delta);
+
+                /* NOTE: Undefined behavior. */
+                return *static_cast<Element *>(nullptr);
+            }
+
+            constexpr const Element &operator [](const ptrdiff_t delta) const noexcept {
+                frd::discard(delta);
+
+                /* NOTE: Undefined behavior. */
+                return *static_cast<Element *>(nullptr);
+            }
+        };
+
+        [[no_unique_address]] array_like _elems{};
+    };
+
+    template<typename Element, frd::size_t Size>
+    class array : public _array_elems<Element, Size> {
         public:
             using value_type      = Element;
             using pointer         = Element *;
@@ -29,8 +67,6 @@ namespace frd {
 
             using reverse_iterator       = frd::reverse_iterator<iterator>;
             using const_reverse_iterator = frd::reverse_iterator<const_iterator>;
-
-            Element _elems[Size];
 
             constexpr void fill(const Element &value) requires (copy_assignable<Element>) {
                 for (auto &elem : *this) {
