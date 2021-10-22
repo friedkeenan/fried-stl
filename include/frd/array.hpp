@@ -27,20 +27,20 @@ namespace frd {
     template<typename Element>
     struct _array_elems<Element, 0> {
         struct array_like {
-            constexpr Element *operator +(const ptrdiff_t delta) const noexcept {
+            constexpr Element *operator +(const frd::ptrdiff_t delta) const noexcept {
                 frd::discard(delta);
 
                 return nullptr;
             }
 
-            constexpr Element &operator [](const ptrdiff_t delta) noexcept {
+            constexpr Element &operator [](const frd::ptrdiff_t delta) noexcept {
                 frd::discard(delta);
 
                 /* NOTE: Undefined behavior. */
                 return *static_cast<Element *>(nullptr);
             }
 
-            constexpr const Element &operator [](const ptrdiff_t delta) const noexcept {
+            constexpr const Element &operator [](const frd::ptrdiff_t delta) const noexcept {
                 frd::discard(delta);
 
                 /* NOTE: Undefined behavior. */
@@ -48,7 +48,7 @@ namespace frd {
             }
         };
 
-        [[no_unique_address]] array_like _elems{};
+        [[no_unique_address]] maybe_const<const_type<Element>, array_like> _elems{};
     };
 
     template<typename Element, frd::size_t Size>

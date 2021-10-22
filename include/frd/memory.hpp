@@ -235,70 +235,43 @@ namespace frd {
 
         /* Cannot be defaulted as then it will try to default-construct 'elem'. */
         constexpr uninitialized() noexcept { }
+
+        /* Cannot be defaulted as then it will try to destroy the possibly uninitialized 'elem'. */
+        constexpr ~uninitialized() noexcept { }
     };
 
-    template<typename T>
+    template<typename Value>
     class allocator {
         public:
-            using value_type = T;
+            using value_type = Value;
             using size_type  = frd::size_t;
-
-            using uninitialized_value = uninitialized<T>;
-
-            /*
-                According to the standard, unions just need to have a
-                *sufficient* size to hold their largest member, which
-                means they could be theoretically larger.
-
-                We check to make sure that isn't the case.
-            */
-            static_assert(sizeof(uninitialized_value) == sizeof(T));
 
             constexpr allocator() noexcept = default;
             constexpr allocator(const allocator &other) noexcept = default;
 
-            template<typename U>
-            constexpr allocator(const allocator<U> &other) {
+            template<typename OtherValue>
+            constexpr allocator(const allocator<OtherValue> &other) {
                 UNUSED(other);
             }
 
             constexpr ~allocator() = default;
 
             [[nodiscard]]
-            constexpr T *allocate(size_type n) const {
-                if constexpr (!platform::clang()) {
-                    /*
-                        I've checked as carefully as I can, and I don't believe this to be UB.
-
-                        Clang will report that you can't cast from 'void *' in constexpr, but
-                        GCC gobbles it up just fine, and if you implement it without constexpr
-                        then Clang works just fine with this on all optimization levels.
-
-                        Technically this is ill-formed as casting from cv-qualified 'void *'
-                        is not a constant expression, but at runtime this should be perfectly
-                        okay.
-                    */
-                    return static_cast<T *>(static_cast<void *>(new uninitialized_value[n]));
-                } else {
-                    return std::allocator<T>().allocate(n);
-                }
+            constexpr Value *allocate(size_type n) const {
+                /*
+                    Sadly, the only reliable way to allocate uninitialized memory within
+                    constant evaluation is with 'std::allocator'.
+                */
+                return std::allocator<Value>().allocate(n);
             }
 
-            constexpr void deallocate(T *ptr, size_type n) const noexcept {
-                if constexpr (!platform::clang()) {
-                    /*
-                        I believe the static_casts are unnecessary but am
-                        including them to remind of how 'ptr' was created.
-                    */
-                    delete[] static_cast<uninitialized_value *>(static_cast<void *>(ptr));
-                } else {
-                    std::allocator<T>().deallocate(ptr, n);
-                }
+            constexpr void deallocate(Value *ptr, size_type n) const noexcept {
+                std::allocator<Value>().deallocate(ptr, n);
             }
 
-            template<typename U>
+            template<typename OtherValue>
             [[nodiscard]]
-            constexpr bool operator ==(const allocator<U> &rhs) const noexcept {
+            constexpr bool operator ==(const allocator<OtherValue> &rhs) const noexcept {
                 UNUSED(rhs);
 
                 return true;

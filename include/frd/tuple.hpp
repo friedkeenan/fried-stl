@@ -323,13 +323,17 @@ namespace frd {
         template<frd::size_t I>
         requires (I == ElementIndex)
         constexpr Element &&get() && noexcept {
-            return frd::move(this->_elem);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<Element &&>(this->_elem);
         }
 
         template<frd::size_t I>
         requires (I == ElementIndex)
         constexpr const Element &&get() const && noexcept {
-            return frd::move(this->_elem);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<const Element &&>(this->_elem);
         }
     };
 
@@ -364,13 +368,17 @@ namespace frd {
         template<frd::size_t I>
         requires (I == 0)
         constexpr Element &&get() && noexcept {
-            return frd::move(this->first);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<Element &&>(this->first);
         }
 
         template<frd::size_t I>
         requires (I == 0)
         constexpr const Element &&get() const && noexcept {
-            return frd::move(this->first);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<const Element &&>(this->first);
         }
     };
 
@@ -398,13 +406,17 @@ namespace frd {
         template<frd::size_t I>
         requires (I == 1)
         constexpr Element &&get() && noexcept {
-            return frd::move(this->second);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<Element &&>(this->second);
         }
 
         template<frd::size_t I>
         requires (I == 1)
         constexpr const Element &&get() const && noexcept {
-            return frd::move(this->second);
+            /* 'static_cast' instead of moving for the case 'Element' is a lvalue reference. */
+
+            return static_cast<const Element &&>(this->second);
         }
     };
 
@@ -507,6 +519,10 @@ namespace frd {
             /*
                 NOTE: All our special member functions are implicitly
                 defined, and therefore trivial if possible.
+
+                TODO: Do we want to have an explicit assignment operator if we
+                contain references, which implicitly deletes our assignment
+                operator? It seems unsafe, but possibly desirable.
             */
 
             template<typename TupleLike, frd::size_t... Indices>

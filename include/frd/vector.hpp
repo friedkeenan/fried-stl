@@ -16,7 +16,7 @@ namespace frd {
         NOTE: We currently do not have strong exception guarantees.
     */
 
-    template<typename Element, allocator_for<Element> Allocator = allocator<Element>>
+    template<object Element, allocator_for<Element> Allocator = allocator<Element>>
     requires (copy_assignable<Element> && copy_constructible<Element>)
     class vector {
         public:
@@ -104,6 +104,49 @@ namespace frd {
                 }
 
                 this->_free_data();
+            }
+
+            constexpr void assign(const size_type size, const Element &value)
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) {
+                /* If 'size' is more than our capacity, we need to allocate more memory. */
+                if (size > this->_capacity) {
+                    /*
+                        We do a special half-reserve where we don't move
+                        any elements since we don't need them anymore.
+                    */
+
+                    this->_cleanup_data();
+
+                    this->_data     = _allocator_traits::allocate(this->_allocator, size);
+                    this->_size     = size;
+                    this->_capacity = size;
+
+                    for (const auto location : interval(this->_data, this->_data + this->_size)) {
+                        _allocator_traits::construct(this->_allocator, location, value);
+                    }
+                } else {
+                    for (const auto i : interval(size)) {
+                        const auto location = this->_data + i;
+
+                        /* If we've reached uninitialized memory, construct objects there, else assign. */
+                        if (i >= this->_size) {
+                            _allocator_traits::construct(this->_allocator, location, value);
+                        } else {
+                            *location = value;
+                        }
+                    }
+
+                    /* Destroy any dangling objects. */
+                    if (size < this->_size) {
+                        for (const auto location : interval(this->_data + size, this->_data + this->_size)) {
+                            _allocator_traits::destroy(this->_allocator, location);
+                        }
+                    }
+
+                    this->_size = size;
+                }
             }
 
             constexpr iterator _to_mutable_iterator(const const_iterator it) {
@@ -347,16 +390,20 @@ namespace frd {
                 this->_size--;
             }
 
-            constexpr void _shift_elements_backward(const iterator begin_shift, const size_type shift_size) {
-                for (const auto elem_it : interval(begin_shift, this->end() - shift_size)) {
-                    *elem_it = frd::iter_move(elem_it + shift_size);
+            constexpr void _shift_elements_backward(const iterator begin_shift, const difference_type shift_size) {
+                for (const auto elem_it : interval(begin_shift, this->end())) {
+                    const auto to_shift_into = elem_it - shift_size;
+
+                    *to_shift_into = frd::iter_move(elem_it);
                 }
             }
 
             constexpr iterator erase(const const_iterator pos) {
+                frd::precondition(pos >= this->begin() && pos < this->end(), "Invalid iterator for erasing!");
+
                 const auto mutable_pos = this->_to_mutable_iterator(pos);
 
-                this->_shift_elements_backward(mutable_pos, 1);
+                this->_shift_elements_backward(mutable_pos + 1, 1);
                 _allocator_traits::destroy(this->_allocator, pointer{frd::prev(this->end())});
 
                 this->_size--;
@@ -364,14 +411,21 @@ namespace frd {
                 return mutable_pos;
             }
 
-            /* Require an 'interval' here? */
             constexpr iterator erase(const const_iterator start, const const_iterator bound) {
+                frd::precondition(start == bound || (start >= this->begin() && start < this->end()), "Invalid iterator for erasing!");
+                frd::precondition(bound >= start && bound <= this->end(), "Invalid bound for erasing!");
+
+                if (start == bound) {
+                    return this->_to_mutable_iterator(bound);
+                }
+
                 const auto erase_size    = bound - start;
                 const auto mutable_start = this->_to_mutable_iterator(start);
+                const auto mutable_bound = this->_to_mutable_iterator(bound);
 
-                this->_shift_elements_backward(mutable_start, erase_size);
+                this->_shift_elements_backward(mutable_bound, erase_size);
 
-                for (const auto elem_it : interval(mutable_start, this->_to_mutable_iterator(bound))) {
+                for (const auto elem_it : interval(this->end() - erase_size, this->end())) {
                     _allocator_traits::destroy(this->_allocator, pointer{elem_it});
                 }
 
@@ -413,28 +467,33 @@ namespace frd {
                 this->shrink_size(0);
             }
 
-            constexpr void resize(const size_type new_size) requires (allocator_value_default_constructible<Allocator>) {
+            template<typename... Args>
+            constexpr void _resize_with_constructor_args(const size_type new_size, Args &&... args) {
                 if (new_size < this->_size) {
                     this->shrink_size(new_size);
                 } else {
                     this->reserve(new_size);
 
                     for (const auto i : interval(this->_size, new_size)) {
-                        _allocator_traits::construct(this->_allocator, this->_data + i);
+                        _allocator_traits::construct(this->_allocator, this->_data + i, frd::forward<Args>(args)...);
                     }
+
+                    this->_size = new_size;
                 }
             }
 
-            constexpr void resize(const size_type new_size, const Element &value) {
-                if (new_size < this->_size) {
-                    this->shrink_size(new_size);
-                } else {
-                    this->reserve(new_size);
+            constexpr void resize(const size_type new_size)
+            requires (
+                allocator_value_default_constructible<Allocator>
+            ) {
+                this->_resize_with_constructor_args(new_size);
+            }
 
-                    for (const auto i : interval(this->_size, new_size)) {
-                        _allocator_traits::construct(this->_allocator, this->_data + i, value);
-                    }
-                }
+            constexpr void resize(const size_type new_size, const Element &value)
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) {
+                this->_resize_with_constructor_args(new_size, value);
             }
 
             [[nodiscard]]
@@ -604,5 +663,14 @@ namespace frd {
                 return true;
             }
     };
+
+    template<input_range R, typename Allocator = allocator<range_value<R>>>
+    requires (
+        !template_specialization_of<R, vector> &&
+
+        allocator_for<Allocator, range_value<R>>                          &&
+        allocator_value_constructible_from<Allocator, range_reference<R>>
+    )
+    vector(R &&, Allocator = Allocator()) -> vector<range_value<R>, Allocator>;
 
 }

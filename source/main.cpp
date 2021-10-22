@@ -112,8 +112,47 @@ consteval bool fuck() {
     struct S {
         bool value = false;
 
+        /* Introduce heap-allocated data to weed out construction without destruction. */
+        int *data = nullptr;
+
         S() = delete;
-        constexpr S(bool value) : value(value) { }
+        constexpr explicit S(bool value) : value(value), data(new int{2}) { }
+
+        constexpr S(const S &other) : value(other.value), data(new int{*other.data}) { }
+
+        constexpr S(S &&other) : value(other.value), data(frd::exchange(other.data, nullptr)) { }
+
+        constexpr void destroy() {
+            if (this->data != nullptr) {
+                delete this->data;
+            }
+        }
+
+        constexpr S &operator =(const S &rhs) {
+            FRD_CHECK_SELF(rhs);
+
+            this->destroy();
+
+            this->value = rhs.value;
+            this->data  = new int{*rhs.data};
+
+            return *this;
+        }
+
+        constexpr S &operator =(S &&rhs) {
+            FRD_CHECK_SELF(rhs);
+
+            this->destroy();
+
+            this->value = rhs.value;
+            this->data  = frd::exchange(rhs.data, nullptr);
+
+            return *this;
+        }
+
+        constexpr ~S() {
+            this->destroy();
+        }
     };
 
     auto v = frd::vector<S>();
