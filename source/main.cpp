@@ -108,56 +108,47 @@ static_assert(frd::random_access_iterator<frd::counted_iterator<frd::reverse_ite
 
 static_assert(frd::same_as<frd::make_index_sequence<5>, frd::index_sequence<0, 1, 2, 3, 4>>);
 
+struct DummyElement {
+    bool value;
+
+    /* Introduce heap-allocated data to weed out construction without destruction. */
+    int *data;
+
+    DummyElement() = delete;
+    constexpr explicit DummyElement(bool value) : value(value), data(new int{2}) { }
+
+    constexpr DummyElement(const DummyElement &other) : value(other.value), data(new int{2}) { }
+
+    constexpr DummyElement(DummyElement &&other) : value(other.value), data(new int{2}) { }
+
+    constexpr DummyElement &operator =(const DummyElement &rhs) {
+        FRD_CHECK_SELF(rhs);
+
+        this->value = rhs.value;
+
+        return *this;
+    }
+
+    constexpr DummyElement &operator =(DummyElement &&rhs) {
+        FRD_CHECK_SELF(rhs);
+
+        this->value = rhs.value;
+
+        return *this;
+    }
+
+    constexpr ~DummyElement() {
+        delete this->data;
+    }
+};
+
 consteval bool fuck() {
-    struct S {
-        bool value = false;
 
-        /* Introduce heap-allocated data to weed out construction without destruction. */
-        int *data = nullptr;
-
-        S() = delete;
-        constexpr explicit S(bool value) : value(value), data(new int{2}) { }
-
-        constexpr S(const S &other) : value(other.value), data(new int{*other.data}) { }
-
-        constexpr S(S &&other) : value(other.value), data(frd::exchange(other.data, nullptr)) { }
-
-        constexpr void destroy() {
-            if (this->data != nullptr) {
-                delete this->data;
-            }
-        }
-
-        constexpr S &operator =(const S &rhs) {
-            FRD_CHECK_SELF(rhs);
-
-            this->destroy();
-
-            this->value = rhs.value;
-            this->data  = new int{*rhs.data};
-
-            return *this;
-        }
-
-        constexpr S &operator =(S &&rhs) {
-            FRD_CHECK_SELF(rhs);
-
-            this->destroy();
-
-            this->value = rhs.value;
-            this->data  = frd::exchange(rhs.data, nullptr);
-
-            return *this;
-        }
-
-        constexpr ~S() {
-            this->destroy();
-        }
-    };
-
-    auto v = frd::vector<S>();
-    v.insert(v.end(), {S(true)});
+    auto v = frd::vector<DummyElement>(0, DummyElement(false));
+    v.insert(v.end(), {DummyElement(true)});
     v.emplace(v.end(), true);
+
+    v.assign(1, DummyElement(false));
 
     v.emplace_back(true);
     v.emplace_back(false);
@@ -165,19 +156,19 @@ consteval bool fuck() {
 
     v.pop_back();
 
-    v.resize(5, S(false));
+    v.resize(5, DummyElement(false));
     v.clear();
 
     v.emplace(v.begin(), false);
     v.emplace(v.begin(), true);
-    v.insert(v.end(), S(true));
+    v.insert(v.end(), DummyElement(true));
 
-    v.insert(v.end(), frd::array{S(false), S(true)});
+    v.insert(v.end(), frd::array{DummyElement(false), DummyElement(true)});
 
-    const auto it = v.insert(v.end(), {S(false), S(true)}) + 1;
+    const auto it = v.insert(v.end(), {DummyElement(false), DummyElement(true)}) + 1;
     it->value = false;
 
-    v.insert(v.end(), 500, S(false));
+    v.insert(v.end(), 500, DummyElement(false));
 
     const auto erase_ret = v.erase(v.begin() + 1, v.end() - 1);
 
@@ -221,13 +212,27 @@ consteval bool cuck() {
 
 static_assert(cuck());
 
-static_assert(frd::vector<int>() == frd::vector<int>());
+static_assert(frd::vector{1, 2, 3} > frd::vector{1, 2});
 
 static_assert(frd::same_as<frd::type_list_concat<frd::type_list<int>, frd::type_list<char>>, frd::type_list<int, char>>);
 
-constexpr inline auto arr = frd::array<int, 0>{};
+constexpr inline auto zero_len_arr = frd::array<int, 0>{};
 
-static_assert(arr.data() == nullptr);
+consteval bool slut() {
+    using Data = frd::allocated_data<DummyElement, frd::allocator<DummyElement>, 5, true>;
+
+    Data heap_data;
+
+    for (const auto i : frd::interval(heap_data.size())) {
+        heap_data.construct_at(i, false);
+    }
+
+    return !heap_data.front().value;
+}
+
+static_assert(slut());
+
+static_assert(frd::allocated_data<DummyElement, frd::allocator<DummyElement>, 0, true>().data() == nullptr);
 
 int main(int argc, char **argv) {
     frd::discard(argc, argv);

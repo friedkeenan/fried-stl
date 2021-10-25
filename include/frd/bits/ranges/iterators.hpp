@@ -2,7 +2,8 @@
 
 #include <iterator>
 
-#include <frd/memory.hpp>
+#include <frd/bits/memory_base.hpp>
+
 #include <frd/type_traits.hpp>
 #include <frd/concepts.hpp>
 

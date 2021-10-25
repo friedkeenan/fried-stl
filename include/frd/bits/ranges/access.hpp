@@ -4,8 +4,8 @@
 #include <ranges>
 
 #include <frd/bits/ranges/iterators.hpp>
+#include <frd/bits/memory_base.hpp>
 
-#include <frd/memory.hpp>
 #include <frd/limits.hpp>
 #include <frd/utility.hpp>
 #include <frd/type_traits.hpp>

@@ -4,6 +4,7 @@
 
 #include <frd/bits/ranges/iterators.hpp>
 #include <frd/bits/ranges/view_base.hpp>
+#include <frd/bits/memory_base.hpp>
 
 #include <frd/defines.hpp>
 #include <frd/span.hpp>

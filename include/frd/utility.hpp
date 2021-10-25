@@ -181,6 +181,7 @@ namespace frd {
         using type = constant_sequence<Ints...>;
     };
 
+    /* TODO: Use the STL version of this for speed and and lower memory footprint? */
     template<integral auto N>
     using make_integer_sequence = typename _make_integer_sequence<N>::type;
 

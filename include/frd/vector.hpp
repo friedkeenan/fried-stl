@@ -54,7 +54,20 @@ namespace frd {
             constexpr vector(const size_type size, const Element &value, const Allocator &alloc = Allocator())
             requires (
                 allocator_value_constructible_from<Allocator, const Element &>
-            ) : _allocator(alloc), _data(_allocator_traits::allocate(this->_allocator, size)), _size(size), _capacity(size) {
+            ) :
+                _allocator(alloc),
+                _data(
+                    [&]() -> pointer {
+                        if (size > 0) {
+                            return _allocator_traits::allocate(this->_allocator, size);
+                        }
+
+                        return nullptr;
+                    }()
+                ),
+                _size(size),
+                _capacity(size)
+            {
                 for (const auto i : interval(size)) {
                     _allocator_traits::construct(this->_allocator, this->_data + i, value);
                 }
@@ -63,7 +76,20 @@ namespace frd {
             constexpr explicit vector(const size_type size, const Allocator &alloc = Allocator())
             requires (
                 allocator_value_default_constructible<Allocator>
-            ) : _allocator(alloc), _data(_allocator_traits::allocate(this->_allocator, size)), _size(size), _capacity(size) {
+            ) :
+                _allocator(alloc),
+                _data(
+                    [&]() -> pointer {
+                        if (size > 0) {
+                            return _allocator_traits::allocate(this->_allocator, size);
+                        }
+
+                        return nullptr;
+                    }()
+                ),
+                _size(size),
+                _capacity(size)
+            {
                 for (const auto i : interval(size)) {
                     _allocator_traits::construct(this->_allocator, this->_data + i);
                 }
@@ -106,26 +132,26 @@ namespace frd {
                 this->_free_data();
             }
 
+            constexpr void _reserve_and_destroy(const size_type new_capacity) {
+                this->_cleanup_data();
+
+                this->_data     = _allocator_traits::allocate(this->_allocator, new_capacity);
+                this->_capacity = new_capacity;
+            }
+
             constexpr void assign(const size_type size, const Element &value)
             requires (
                 allocator_value_constructible_from<Allocator, const Element &>
             ) {
                 /* If 'size' is more than our capacity, we need to allocate more memory. */
                 if (size > this->_capacity) {
-                    /*
-                        We do a special half-reserve where we don't move
-                        any elements since we don't need them anymore.
-                    */
-
-                    this->_cleanup_data();
-
-                    this->_data     = _allocator_traits::allocate(this->_allocator, size);
-                    this->_size     = size;
-                    this->_capacity = size;
+                    this->_reserve_and_destroy(size);
 
                     for (const auto location : interval(this->_data, this->_data + this->_size)) {
                         _allocator_traits::construct(this->_allocator, location, value);
                     }
+
+                    this->_size = size;
                 } else {
                     for (const auto i : interval(size)) {
                         const auto location = this->_data + i;
@@ -155,7 +181,7 @@ namespace frd {
                 return (begin + (it - begin));
             }
 
-            constexpr void _reserve_impl(const size_type new_capacity) {
+            constexpr void _reserve_and_move(const size_type new_capacity) {
                 frd::precondition(new_capacity <= this->max_size(), "Cannot reserve enough data!");
                 frd::precondition(new_capacity >= this->_size,      "Cannot reserve less than current size!");
 
@@ -182,7 +208,7 @@ namespace frd {
                     return;
                 }
 
-                this->_reserve_impl(new_capacity);
+                this->_reserve_and_move(new_capacity);
             }
 
             template<typename... Args>
@@ -193,11 +219,11 @@ namespace frd {
                     to slightly suboptimal performance, and this code is easier to understand.
                 */
 
-                /* We call '_reserve_impl' to avoid checks of current capacity. */
+                /* We call '_reserve_and_move' to avoid checks of current capacity. */
                 if (this->_capacity == 0) {
-                    this->_reserve_impl(1);
+                    this->_reserve_and_move(1);
                 } else if (this->_size + 1 > this->_capacity) {
-                    this->_reserve_impl(NewCapacityRatio * this->_capacity);
+                    this->_reserve_and_move(NewCapacityRatio * this->_capacity);
                 }
 
                 const auto location = this->_data + this->_size;
@@ -440,7 +466,7 @@ namespace frd {
                     return;
                 }
 
-                this->_reserve_impl(this->_size);
+                this->_reserve_and_move(this->_size);
             }
 
             /*
