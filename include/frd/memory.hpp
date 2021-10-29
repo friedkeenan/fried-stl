@@ -391,6 +391,8 @@ namespace frd {
     >
     class allocated_data {
         public:
+            /* TODO: Strong exception guarantees? */
+
             using _allocator_traits = allocator_traits<Allocator>;
 
             using allocator_type  = Allocator;
@@ -417,14 +419,200 @@ namespace frd {
 
             pointer _data = nullptr;
 
-            [[no_unique_address]] maybe_present<SizeIsCapacity,  size_type> _size     = 0;
+            [[no_unique_address]] maybe_present<!SizeIsCapacity, size_type> _size     = 0;
             [[no_unique_address]] maybe_present<DynamicCapacity, size_type> _capacity = 0;
+
+            constexpr allocated_data() requires (DynamicCapacity && default_initializable<Allocator>) = default;
+
+            constexpr allocated_data(const Allocator &alloc) requires (DynamicCapacity) : _allocator(alloc) { }
 
             constexpr allocated_data() requires (!DynamicCapacity && default_initializable<Allocator>)
                 : _data(this->_allocate(this->capacity())) { }
 
             constexpr allocated_data(const Allocator &alloc) requires (!DynamicCapacity)
                 : _allocator(alloc), _data(this->_allocate(this->capacity())) { }
+
+            constexpr allocated_data(const size_type capacity, const Allocator &alloc = Allocator())
+            requires (
+                DynamicCapacity &&
+                SizeIsCapacity
+            ) : _allocator(alloc), _data(this->_allocate(capacity)), _capacity(capacity) { }
+
+            constexpr allocated_data(const size_type capacity, const size_type size = 0, const Allocator &alloc = Allocator())
+            requires (
+                DynamicCapacity &&
+                !SizeIsCapacity
+            ) :
+                _allocator(alloc),
+                _data(this->_allocate(capacity)),
+                _size(size),
+                _capacity(capacity)
+            {
+                frd::precondition(size <= capacity, "Size must not exceed capacity!");
+            }
+
+            constexpr allocated_data(const allocated_data &other)
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) :
+                _allocator(
+                    _allocator_traits::select_on_container_copy_construction(other._allocator)
+                ),
+                _data(this->_allocate(other.size())),
+                _size(other.size()),
+                _capacity(other.size())
+            {
+                for (const auto i : interval(this->size())) {
+                    this->construct_at(i, other[i]);
+                }
+            }
+
+            /*
+                TODO: Figure out correct semantics for moving an 'allocated_data' object with static capacity.
+
+                For objects with a static capacity, they *always* need data of that capacity, and furthermore
+                if their size is also the same as their capacity, then at least for destruction they need valid
+                objects populating all of that data, since the size can't be set to 0. The crux of the issue
+                comes from what to do with the allocator. Do we move it? That doesn't seem right, since the
+                moved-from container still needs it, at least for destruction. We could potentially move it and
+                then destruct its elements for it, but then when it tries to destruct itself, it'll try to destruct
+                its elements too, and we can't necessarily stop it by changing its size since its size may be
+                static as well. We could maybe use 'select_on_container_copy_construction' but I'm not sure that
+                would be correct since we're not copying the elements, we'd be moving them. Maybe we could have
+                a move constructor if the allocators are always equal and default-constructible? Not sure that's
+                a case worth giving special treatment. We could just delete the corresponding move constructors,
+                so at least they don't fall back silently to the copy constructors, but then that would cause it
+                to fail to satisfy 'copyable' and other copy-related concepts since the type would not be movable.
+
+                It might still be nice to have a facility that could move elements into another container.
+            */
+
+            constexpr allocated_data(allocated_data &&other) noexcept
+            requires (
+                DynamicCapacity
+            ) :
+                _allocator(frd::move(other._allocator)),
+                _data(frd::exchange(other._data, nullptr)),
+                _size(frd::exchange(other._size, size_type{0})),
+                _capacity(frd::exchange(other._capacity, size_type{0}))
+            { }
+
+            constexpr allocated_data(const allocated_data &other, const Allocator &alloc)
+            requires (
+                allocator_value_constructible_from<Allocator, const Element &>
+            ) :
+                _allocator(alloc),
+                _data(this->_allocate(other.size())),
+                _size(other.size()),
+                _capacity(other,size())
+            {
+                for (const auto i : interval(this->size())) {
+                    this->construct_at(i, other[i]);
+                }
+            }
+
+            constexpr allocated_data(allocated_data &&other, const Allocator &alloc)
+            noexcept(
+                nothrow_constructible_from<Allocator, const Allocator &>
+            )
+            requires (
+                DynamicCapacity &&
+
+                _allocator_traits::always_equal
+            ) :
+                _allocator(alloc),
+                _data(frd::exchange(other._data, nullptr)),
+                _size(frd::exchange(other._size, size_type{0})),
+                _capacity(frd::exchange(other._capacity, size_type{0}))
+            { }
+
+            constexpr allocated_data(allocated_data &&other, const Allocator &alloc)
+            requires (
+                DynamicCapacity &&
+
+                allocator_value_constructible_from<Allocator, Element &&>
+            ) :
+                _allocator(alloc),
+                _size(other.size())
+            {
+                if (other.empty()) {
+                    return;
+                }
+
+                if (this->_allocator == other._allocator) {
+                    this->_data     = frd::exchange(other._data,     nullptr);
+                    this->_size     = frd::exchange(other._size,     size_type{0});
+                    this->_capacity = frd::exchange(other._capacity, size_type{0});
+                } else {
+                    this->_data     = this->_allocate(other.size());
+                    this->_size     = other.size();
+                    this->_capacity = other.size();
+
+                    for (const auto i : interval(this->size())) {
+                        this->construct_at(i, frd::move(other[i]));
+                    }
+                }
+            }
+
+            /* TODO: Find a way to shorten this function? */
+            constexpr allocated_data &operator =(const allocated_data &rhs) {
+                FRD_CHECK_SELF(rhs);
+
+                bool reallocated = false;
+
+                if constexpr (_allocator_traits::propagate_on_container_copy_assignment) {
+                    if (!_allocator_traits::are_equal(this->_allocator, rhs._allocator)) {
+                        this->cleanup_data();
+
+                        if constexpr (DynamicCapacity) {
+                            this->_data     = rhs._allocate(rhs.size());
+                            this->_capacity = rhs.size();
+                        } else {
+                            this->_data = rhs._allocate(this->capacity());
+                        }
+
+                        reallocated = true;
+                    }
+
+                    this->_allocator = rhs._allocator;
+                }
+
+                /*
+                    We only need to do this check if we have a dynamic capacity since it
+                    is a precondition that our static capacity can fit any size we reach.
+                */
+                if constexpr (DynamicCapacity) {
+                    if (this->capacity() < rhs.size()) {
+                        this->cleanup_data();
+
+                        this->_data     = this->_allocate(rhs.size());
+                        this->_capacity = rhs.size();
+
+                        reallocated = true;
+                    }
+                }
+
+                for (const auto i : interval(rhs.size())) {
+                    /* If we didn't need to reallocate, we can just assign to our elements. */
+                    if (reallocated || i >= this->size()) {
+                        this->construct_at(i, rhs[i]);
+                    } else {
+                        *(this->begin() + i) = rhs[i];
+                    }
+                }
+
+                if (this->size() > rhs.size()) {
+                    for (const auto i : interval(rhs.size(), this->size())) {
+                        this->destroy_at(i);
+                    }
+                }
+
+                if constexpr (!SizeIsCapacity) {
+                    this->change_size(rhs.size());
+                }
+
+                return *this;
+            }
 
             constexpr ~allocated_data() {
                 this->cleanup_data();
@@ -434,11 +622,18 @@ namespace frd {
                 this->_deallocate(this->data(), this->capacity());
             }
 
-            constexpr void cleanup_data() {
-                for (const auto i : interval(this->size())) {
+            constexpr void destroy_elements_up_to(const size_type index) {
+                for (const auto i : interval(index)) {
                     this->destroy_at(i);
                 }
+            }
 
+            constexpr void destroy_elements() {
+                this->destroy_elements_up_to(this->size());
+            }
+
+            constexpr void cleanup_data() {
+                this->destroy_elements();
                 this->free_data();
             }
 
@@ -451,7 +646,7 @@ namespace frd {
             template<typename... Args>
             requires (allocator_value_constructible_from<Allocator, Args...>)
             constexpr void construct_at(const size_type index, Args &&... args) {
-                frd::precondition(index < this->size(), "Invalid index for construction!");
+                frd::precondition(index < this->capacity(), "Invalid index for construction!");
 
                 this->construct_at_ptr(this->data() + index, frd::forward<Args>(args)...);
             }
@@ -461,7 +656,7 @@ namespace frd {
             }
 
             constexpr void destroy_at(const size_type index) {
-                frd::precondition(index < this->size(), "Invalid index for destruction!");
+                frd::precondition(index < this->capacity(), "Invalid index for destruction!");
 
                 this->destroy_at_ptr(this->data() + index);
             }
@@ -499,7 +694,9 @@ namespace frd {
 
             constexpr void reserve_and_move(const size_type new_capacity)
             requires (
-                DynamicCapacity
+                DynamicCapacity &&
+
+                allocator_value_constructible_from<Allocator, Element &&>
             ) {
                 this->_reserve_preconditions(new_capacity);
 
@@ -529,6 +726,8 @@ namespace frd {
                 if constexpr (SizeIsCapacity) {
                     return this->capacity();
                 } else {
+                    frd::precondition(this->_size <= this->capacity(), "Size must not exceed capacity!");
+
                     return this->_size;
                 }
             }
@@ -538,6 +737,8 @@ namespace frd {
                 /* If size and capacity are the same, the reserve methods should be used. */
                 !SizeIsCapacity
             ) {
+                frd::precondition(new_size <= this->capacity(), "Size must not exceed capacity!");
+
                 this->_size = new_size;
             }
 
@@ -545,6 +746,8 @@ namespace frd {
             requires (
                 !SizeIsCapacity
             ) {
+                frd::precondition(this->_size + increment <= this->capacity(), "Size must not exceed capacity!");
+
                 this->_size += increment;
             }
 
@@ -637,6 +840,41 @@ namespace frd {
                 frd::precondition(index < this->size(), "Index is past bounds of data!");
 
                 return this->_data[index];
+            }
+
+            constexpr auto operator <=>(const allocated_data &rhs) const
+            noexcept(
+                nothrow_synthetic_three_way_comparable<const Element &>
+            )
+            requires (
+                synthetic_three_way_comparable<const Element &>
+            ) {
+                for (const auto &[lhs_elem, rhs_elem] : views::zip(*this, rhs)) {
+                    const auto cmp = synthetic_three_way_compare(lhs_elem, rhs_elem);
+
+                    if (cmp != 0) {
+                        return cmp;
+                    }
+                }
+
+                return this->_size <=> rhs._size;
+            }
+
+            constexpr bool operator ==(const allocated_data &rhs) const
+            requires (
+                equality_comparable<const Element &>
+            ) {
+                if (this->_size != rhs._size) {
+                    return false;
+                }
+
+                for (const auto &[lhs_elem, rhs_elem] : views::zip(*this, rhs)) {
+                    if (lhs_elem != rhs_elem) {
+                        return false;
+                    }
+                }
+
+                return true;
             }
     };
 

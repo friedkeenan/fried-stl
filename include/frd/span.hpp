@@ -5,9 +5,9 @@
 
 #include <frd/bits/ranges/access.hpp>
 #include <frd/bits/ranges/reverse_view.hpp>
+#include <frd/bits/memory_base.hpp>
 
 #include <frd/arithmetic.hpp>
-#include <frd/memory.hpp>
 #include <frd/utility.hpp>
 #include <frd/array.hpp>
 #include <frd/type_traits.hpp>

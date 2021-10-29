@@ -19,7 +19,8 @@ namespace frd {
         return frd::forward<T>(t);
     }
 
-    template<typename T, typename U = T>
+    template<move_constructible T, typename U = T>
+    requires (assignable_from<T &, U>)
     [[nodiscard]]
     constexpr T exchange(T &obj, U &&new_value)
     noexcept(

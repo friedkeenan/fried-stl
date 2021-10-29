@@ -110,7 +110,7 @@ namespace frd {
                     ) : _its(frd::tuple_convert<range_iterator<const Views>...>(frd::move(it._its))) { }
 
                     constexpr auto operator *() const {
-                        return this->_its.transform([](auto &it) -> decltype(auto) {
+                        return frd::tuple_transform(this->_its, [](auto &it) -> decltype(auto) {
                             return *it;
                         });
                     }
@@ -172,7 +172,7 @@ namespace frd {
                     requires (
                         _zip_all_random_access<Const, Views...>
                     ) {
-                        return this->_its.transform([delta]<typename It>(It &it) -> decltype(auto) {
+                        return frd::tuple_transform(this->_its, [delta]<typename It>(It &it) -> decltype(auto) {
                             return it[static_cast<iter_difference<It>>(delta)];
                         });
                     }
@@ -254,7 +254,7 @@ namespace frd {
                         (noexcept(frd::iter_move(frd::declval<const range_iterator<maybe_const<Const, Views>> &>())) && ...) &&
                         (nothrow_move_constructible<range_rvalue_reference<maybe_const<Const, Views>>> && ...)
                     ) {
-                        return it._its.transform(frd::iter_move);
+                        return frd::tuple_transform(it._its, frd::iter_move);
                     }
 
                     template<frd::size_t... Indices>
@@ -353,30 +353,30 @@ namespace frd {
             constexpr explicit zip_view(Views... views) : _views({frd::move(views)...}) { }
 
             constexpr auto begin() requires (!(_simple_view<Views> && ...)) {
-                return iterator<false>(this->_views.transform(frd::begin));
+                return iterator<false>(frd::tuple_transform(this->_views, frd::begin));
             }
 
             constexpr auto begin() const requires (range<const Views> && ...) {
-                return iterator<true>(this->_views.transform(frd::begin));
+                return iterator<true>(frd::tuple_transform(this->_views, frd::begin));
             }
 
             constexpr auto end() requires (!(_simple_view<Views> && ...)) {
                 if constexpr (!_zip_is_common<Views...>) {
-                    return sentinel<false>(this->_views.transform(frd::end));
+                    return sentinel<false>(frd::tuple_transform(this->_views, frd::end));
                 } else if constexpr ((random_access_range<Views> && ...)) {
                     return this->begin() + static_cast<iter_difference<iterator<false>>>(this->size());
                 } else {
-                    return iterator<false>(this->_views.transform(frd::end));
+                    return iterator<false>(frd::tuple_transform(this->_views, frd::end));
                 }
             }
 
             constexpr auto end() const requires (range<const Views> && ...) {
                 if constexpr (!_zip_is_common<const Views...>) {
-                    return sentinel<true>(this->_views.transform(frd::end));
+                    return sentinel<true>(frd::tuple_transform(this->_views, frd::end));
                 } else if constexpr ((random_access_range<const Views> && ...)) {
                     return this->begin() + static_cast<iter_difference<iterator<true>>>(this->size());
                 } else {
-                    return iterator<true>(this->_views.transform(frd::end));
+                    return iterator<true>(frd::tuple_transform(this->_views, frd::end));
                 }
             }
 
@@ -388,7 +388,7 @@ namespace frd {
                     using CommonSize = make_unsigned<std::common_type_t<decltype(sizes)...>>;
 
                     return frd::min(static_cast<CommonSize>(sizes)...);
-                }, this->_views.transform(frd::size));
+                }, frd::tuple_transform(this->_views, frd::size));
             }
 
             constexpr auto size() const
@@ -399,7 +399,7 @@ namespace frd {
                     using CommonSize = make_unsigned<std::common_type_t<decltype(sizes)...>>;
 
                     return frd::min(static_cast<CommonSize>(sizes)...);
-                }, this->_views.transform(frd::size));
+                }, frd::tuple_transform(this->_views, frd::size));
             }
     };
 

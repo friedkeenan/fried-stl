@@ -219,18 +219,27 @@ static_assert(frd::same_as<frd::type_list_concat<frd::type_list<int>, frd::type_
 constexpr inline auto zero_len_arr = frd::array<int, 0>{};
 
 consteval bool slut() {
-    using Data = frd::allocated_data<DummyElement, frd::allocator<DummyElement>, 5, true>;
+    using Data = frd::allocated_data<DummyElement>;
 
-    Data heap_data;
+    auto heap_data = Data(5, 5);
 
-    for (const auto i : frd::interval(heap_data.size())) {
+    for (const auto i : frd::interval(heap_data.capacity())) {
         heap_data.construct_at(i, false);
     }
 
-    return !heap_data.front().value;
+    heap_data.reserve_and_move(6);
+
+    auto other_data = Data(5);
+    heap_data = other_data;
+
+    return true;
+
+    return !other_data.back().value;
 }
 
 static_assert(slut());
+
+static_assert(frd::allocated_data<int>() == frd::allocated_data<int>());
 
 static_assert(frd::allocated_data<DummyElement, frd::allocator<DummyElement>, 0, true>().data() == nullptr);
 
@@ -281,8 +290,8 @@ int main(int argc, char **argv) {
     );
 
     std::printf(
-        "%d\n",
-        frd::get<1>(frd::pair{4, 6}.transform([](int x) {
+        "transform %d\n",
+        frd::get<1>(frd::tuple_transform(frd::pair{4, 6}, [](int x) {
             return x * 2;
         }))
     );
@@ -321,6 +330,11 @@ int main(int argc, char **argv) {
     frd::apply([](int x, int y) {
         std::printf("assign %d %d\n", x, y);
     }, assigned);
+
+    // int elem = 6;
+    // int other_elem = 9;
+    // frd::tie(elem) = frd::tie(other_elem);
+    // std::printf("tie %d\n", elem);
 
     return 0;
 }

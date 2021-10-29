@@ -205,6 +205,9 @@ namespace frd {
         sizeof(T);
     };
 
+    template<typename T>
+    concept possible_data_member = !function<T> && !incomplete<T>;
+
     template<typename T, template<typename...> typename Template>
     concept template_specialization_of = is_template_specialization_of<T, Template>;
 

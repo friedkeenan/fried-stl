@@ -411,6 +411,8 @@ namespace frd {
             }
 
             constexpr void pop_back() {
+                frd::precondition(this->_size > 0, "Cannot perform pop_back on a vector of 0 elements!");
+
                 _allocator_traits::destroy(this->_allocator, this->_data + this->_size - 1);
 
                 this->_size--;

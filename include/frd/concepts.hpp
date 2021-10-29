@@ -7,6 +7,9 @@
 
 namespace frd {
 
+    template<typename T, typename Decay>
+    concept decays_to = same_as<decay<T>, Decay>;
+
     template<typename From, typename To>
     concept convertible_to_non_slicing = (
         convertible_to<From, To>                           &&
