@@ -483,8 +483,6 @@ namespace frd {
                 a case worth giving special treatment. We could just delete the corresponding move constructors,
                 so at least they don't fall back silently to the copy constructors, but then that would cause it
                 to fail to satisfy 'copyable' and other copy-related concepts since the type would not be movable.
-
-                It might still be nice to have a facility that could move elements into another container.
             */
 
             constexpr allocated_data(allocated_data &&other) noexcept

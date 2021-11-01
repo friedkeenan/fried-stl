@@ -77,6 +77,9 @@ static_assert(sizeof(frd::int_for_bit_size<128>) == 16);
 
 static_assert(frd::tuple_like<frd::tuple<int>>);
 static_assert(frd::tuple_like<frd::tuple<>>);
+
+static_assert(frd::pair_like<int[2]>);
+
 static_assert(!frd::tuple_like<int>);
 
 static_assert(frd::pair_like<frd::pair<int, int>>);
@@ -243,9 +246,7 @@ static_assert(frd::allocated_data<int>() == frd::allocated_data<int>());
 
 static_assert(frd::allocated_data<DummyElement, frd::allocator<DummyElement>, 0, true>().data() == nullptr);
 
-int main(int argc, char **argv) {
-    frd::discard(argc, argv);
-
+int main() {
     static constexpr auto fuck = frd::array{1, 2};
 
     std::printf("%d\n", frd::get<1>(fuck));
@@ -330,11 +331,4 @@ int main(int argc, char **argv) {
     frd::apply([](int x, int y) {
         std::printf("assign %d %d\n", x, y);
     }, assigned);
-
-    // int elem = 6;
-    // int other_elem = 9;
-    // frd::tie(elem) = frd::tie(other_elem);
-    // std::printf("tie %d\n", elem);
-
-    return 0;
 }
