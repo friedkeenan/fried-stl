@@ -218,6 +218,7 @@ static_assert(cuck());
 static_assert(frd::vector{1, 2, 3} > frd::vector{1, 2});
 
 static_assert(frd::same_as<frd::type_list_concat<frd::type_list<int>, frd::type_list<char>>, frd::type_list<int, char>>);
+static_assert(frd::same_as<frd::type_list_concat<>, frd::type_list<>>);
 
 constexpr inline auto zero_len_arr = frd::array<int, 0>{};
 

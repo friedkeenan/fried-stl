@@ -47,7 +47,7 @@ namespace frd {
     class zip_view : public view_interface<zip_view<Views...>> {
         public:
             /*
-                NOTE: the standard uses an exposition only 'tuple-or-pair'
+                NOTE: The standard uses an exposition only 'tuple-or-pair'
                 template that uses a tuple or pair depending on the amount
                 of elements. We do not need to do so as our 'pair' is just
                 an alias for 'tuple'.
@@ -303,7 +303,7 @@ namespace frd {
                         /*
                             NOTE: This is not the same as comparing the underlying tuples.
 
-                            Comparing tuples will back out once on of the elements *is not*
+                            Comparing tuples will back out once one of the elements *is not*
                             equal. We need to back out once one the elements *is* equal.
                         */
 

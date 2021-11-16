@@ -24,7 +24,7 @@ namespace frd {
     [[nodiscard]]
     constexpr T exchange(T &obj, U &&new_value)
     noexcept(
-        nothrow_constructible_from<T, T &&> &&
+        nothrow_move_constructible<T>   &&
         nothrow_assignable_from<T &, U>
     ) {
         T old_value = frd::move(obj);

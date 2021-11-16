@@ -114,13 +114,7 @@ namespace frd {
     };
 
     template<typename... TypeLists>
-    struct _type_list_concat : type_holder<decltype((TypeLists{} + ...))> { };
-
-    template<>
-    struct _type_list_concat<> : type_holder<type_list<>> { };
-
-    template<typename... TypeLists>
-    using type_list_concat = typename _type_list_concat<TypeLists...>::type;
+    using type_list_concat = decltype((type_list<>{} + ... + TypeLists{}));
 
     template<template<typename...> typename Template, typename ArgsList>
     struct _template_from_type_list;

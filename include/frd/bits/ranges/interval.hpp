@@ -260,9 +260,8 @@ namespace frd {
             }
     };
 
-    template<typename T>
-    requires (integral<remove_cvref<T>>)
-    interval(T &&) -> interval<decay<T>, decay<T>>;
+    template<integral Bound>
+    interval(Bound) -> interval<Bound, Bound>;
 
     template<typename Start, typename Bound>
     interval(Start &&, Bound &&) -> interval<decay<Start>, decay<Bound>>;
